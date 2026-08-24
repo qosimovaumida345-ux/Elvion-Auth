@@ -118,7 +118,7 @@ const AI_PROVIDERS = {
     },
     cerebras: {
         baseUrl: 'https://api.cerebras.ai/v1',
-        model: 'llama-3.3-70b',
+        model: 'gpt-oss-120b',
         apiKey: process.env.CEREBRAS_API_KEY || ''
     }
 };
@@ -201,13 +201,14 @@ app.use(async (req, res, next) => {
         }
 
         if (isStream) {
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Transfer-Encoding', 'chunked');
+            res.write('[\n');
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let aiTextBuffer = '';
+            let isFirstChunk = true;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -224,23 +225,26 @@ app.use(async (req, res, next) => {
                                 const text = data.choices[0].delta.content;
                                 aiTextBuffer += text;
 
-                                // Translate back to Google stream format
-                                const googleChunk = [{
+                                const googleChunk = {
                                     candidates: [{
                                         content: { parts: [{ text }] },
                                         finishReason: null
                                     }]
-                                }];
+                                };
 
-                                res.write('data: ' + JSON.stringify(googleChunk) + '\r\n\r\n');
+                                if (!isFirstChunk) {
+                                    res.write(',\n');
+                                }
+                                res.write(JSON.stringify(googleChunk));
+                                isFirstChunk = false;
                             }
                         } catch (e) {
-                            // ignore parse error on incomplete chunks
+                            // ignore parse error
                         }
                     }
                 }
             }
-            res.write('data: [DONE]\r\n\r\n');
+            res.write('\n]');
             res.end();
         } else {
             const data = await response.json();
