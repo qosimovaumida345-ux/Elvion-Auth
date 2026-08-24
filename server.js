@@ -49,7 +49,57 @@ app.get('/auth/google/callback', async (req, res) => {
         const tokenData = await tokenResponse.json();
 
         if (tokenData.access_token) {
-            res.redirect('elvion-ide://auth?token=' + tokenData.access_token);
+            const authUri = 'elvion-ide://auth?token=' + encodeURIComponent(tokenData.access_token);
+            res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auth Success — Open Elvion IDE</title>
+<link rel="icon" href="/logo.png" type="image/png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#080b14;
+  --surface:rgba(15,20,35,0.85);
+  --border:rgba(100,130,255,0.08);
+  --accent:#4f6ef7;
+  --accent2:#7c5bf5;
+  --text:#e8ecf4;
+  --text2:#8893a7;
+  --success:#22c55e;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center}
+.card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px 40px;text-align:center;backdrop-filter:blur(40px);box-shadow:0 0 80px rgba(79,110,247,0.1),0 32px 64px rgba(0,0,0,0.5)}
+.icon-wrap{width:72px;height:72px;margin:0 auto 24px;border-radius:50%;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center}
+.icon-wrap svg{width:36px;height:36px;stroke:var(--success);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+h1{font-size:24px;font-weight:700;margin-bottom:8px;letter-spacing:-0.5px}
+p{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.6}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 24px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 8px 32px rgba(79,110,247,0.3);transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(79,110,247,0.4)}
+.btn:active{transform:translateY(0)}
+.hint{font-size:12px;color:var(--text2);margin-top:20px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon-wrap">
+    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <h1>Authentication Successful</h1>
+  <p>Your Google account has been connected to Elvion.<br>Opening Elvion IDE now...</p>
+  <a href="${authUri}" class="btn" id="openBtn">
+    <span>Open Elvion IDE</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+  </a>
+  <div class="hint">If the app doesn't open automatically, click the button above.</div>
+</div>
+<script>
+window.location.href = "${authUri}";
+</script>
+</body>
+</html>`);
         } else {
             res.redirect('/?error=token_failed');
         }
