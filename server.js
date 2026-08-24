@@ -14,23 +14,23 @@ app.use(express.json());
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Google OAuth 2.0 Credentials
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const REDIRECT_URI = process.env.REDIRECT_URI || 'https://elvion-auth.onrender.com/auth/google/callback';
 
 app.get('/auth/google', (req, res) => {
-    const authUrl = \https://accounts.google.com/o/oauth2/v2/auth?client_id=\&redirect_uri=\&response_type=code&scope=email profile\;
+    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+        + '?client_id=' + encodeURIComponent(GOOGLE_CLIENT_ID)
+        + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
+        + '&response_type=code'
+        + '&scope=' + encodeURIComponent('email profile');
     res.redirect(authUrl);
 });
 
 app.get('/auth/google/callback', async (req, res) => {
     const code = req.query.code;
-    
-    if (!code) {
-        return res.redirect('/?error=access_denied');
-    }
-    
+    if (!code) return res.redirect('/?error=access_denied');
+
     try {
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
@@ -43,12 +43,9 @@ app.get('/auth/google/callback', async (req, res) => {
                 grant_type: 'authorization_code'
             })
         });
-        
         const tokenData = await tokenResponse.json();
-        
         if (tokenData.access_token) {
-            // O'zimizning IDE tushunadigan deep linkga qaytaramiz
-            res.redirect(\elvion-ide://auth?token=\\);
+            res.redirect('elvion-ide://auth?token=' + tokenData.access_token);
         } else {
             res.redirect('/?error=token_failed');
         }
@@ -58,22 +55,14 @@ app.get('/auth/google/callback', async (req, res) => {
     }
 });
 
-// AI proxy catch-all
 app.use((req, res, next) => {
-    if (req.path === '/' || req.path === '/index.html' || req.path.startsWith('/auth')) {
-        return next();
-    }
-    
-    console.log('[Elvion-Auth] Intercepted AI Request: ' + req.method + ' ' + req.path);
-    
+    if (req.path === '/' || req.path === '/index.html' || req.path.startsWith('/auth')) return next();
+    console.log('[Elvion-Auth] AI Request: ' + req.method + ' ' + req.path);
     res.json({
-        candidates: [{
-            content: { parts: [{ text: "[Elvion AI Bridge] AI backend logic is active." }] },
-            finishReason: "STOP"
-        }]
+        candidates: [{ content: { parts: [{ text: '[Elvion AI Bridge] AI backend active.' }] }, finishReason: 'STOP' }]
     });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log('🚀 Elvion-Auth Server running on port ' + PORT);
+    console.log('Elvion-Auth Server running on port ' + PORT);
 });
