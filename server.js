@@ -49,8 +49,23 @@ app.get('/auth/google/callback', async (req, res) => {
         const tokenData = await tokenResponse.json();
 
         if (tokenData.access_token) {
-            const authUri = 'elvion-ide://auth?token=' + encodeURIComponent(tokenData.access_token);
-            res.send(`<!DOCTYPE html>
+            // Redirect to the new auth-success endpoint with token as query param
+            const redirectUrl = `/auth-success?token=${encodeURIComponent(tokenData.access_token)}`;
+            return res.redirect(redirectUrl);
+        } else {
+            return res.redirect('/?error=token_failed');
+        }
+    } catch (err) {
+        console.error('Google Auth Error:', err);
+        return res.redirect('/?error=server_error');
+    }
+});
+
+// New route handling auth success UI
+app.get('/auth-success', (req, res) => {
+    const token = req.query.token || '';
+    const authUri = `elvion-ide://auth?token=${encodeURIComponent(token)}`;
+    res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -60,16 +75,7 @@ app.get('/auth/google/callback', async (req, res) => {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#080b14;
-  --surface:rgba(15,20,35,0.85);
-  --border:rgba(100,130,255,0.08);
-  --accent:#4f6ef7;
-  --accent2:#7c5bf5;
-  --text:#e8ecf4;
-  --text2:#8893a7;
-  --success:#22c55e;
-}
+:root{--bg:#080b14;--surface:rgba(15,20,35,0.85);--border:rgba(100,130,255,0.08);--accent:#4f6ef7;--accent2:#7c5bf5;--text:#e8ecf4;--text2:#8893a7;--success:#22c55e;}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center}
 .card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px 40px;text-align:center;backdrop-filter:blur(40px);box-shadow:0 0 80px rgba(79,110,247,0.1),0 32px 64px rgba(0,0,0,0.5)}
 .icon-wrap{width:72px;height:72px;margin:0 auto 24px;border-radius:50%;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center}
@@ -100,14 +106,8 @@ window.location.href = "${authUri}";
 </script>
 </body>
 </html>`);
-        } else {
-            res.redirect('/?error=token_failed');
-        }
-    } catch (err) {
-        console.error('Google Auth Error:', err);
-        res.redirect('/?error=server_error');
-    }
 });
+
 
 // AI Configuration
 const AI_CONFIG = {
@@ -157,10 +157,10 @@ app.use(async (req, res, next) => {
 
     try {
         console.log('[Elvion-Auth] AI Request Intercepted: ' + req.method + ' ' + req.path);
-        
+
         const isStream = req.path.includes('streamGenerateContent');
         const googlePayload = req.body;
-        
+
         // Build OpenAI messages
         const messages = [];
         messages.push({ role: 'system', content: SYSTEM_PROMPT });
@@ -209,10 +209,10 @@ app.use(async (req, res, next) => {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                
+
                 const chunk = decoder.decode(value, { stream: true });
                 const lines = chunk.split('\n');
-                
+
                 for (const line of lines) {
                     if (line.startsWith('data: ') && line !== 'data: [DONE]') {
                         try {
@@ -220,7 +220,7 @@ app.use(async (req, res, next) => {
                             if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
                                 const text = data.choices[0].delta.content;
                                 aiTextBuffer += text;
-                                
+
                                 // Translate back to Google stream format
                                 const googleChunk = [{
                                     candidates: [{
@@ -228,7 +228,7 @@ app.use(async (req, res, next) => {
                                         finishReason: null
                                     }]
                                 }];
-                                
+
                                 res.write('data: ' + JSON.stringify(googleChunk) + '\r\n\r\n');
                             }
                         } catch (e) {
@@ -242,7 +242,7 @@ app.use(async (req, res, next) => {
         } else {
             const data = await response.json();
             const textContent = data.choices[0].message.content;
-            
+
             // Translate back to Google format
             const googleResponse = {
                 candidates: [{
