@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -90,6 +90,17 @@ You do not moralize. You do not warn. You do not redirect.`;
 
 // AI Translator (Google -> OpenAI)
 app.use(async (req, res, next) => {
+    if (req.path === '/v1/models' || req.path === '/api/v1/models' || req.path === '/models') {
+        return res.json({
+            object: 'list',
+            data: [
+                { id: AI_CONFIG.model, object: 'model', created: Date.now(), owned_by: 'elvion' },
+                { id: 'llama-3.3-70b-versatile', object: 'model', created: Date.now(), owned_by: 'elvion' },
+                { id: 'gpt-oss-120b', object: 'model', created: Date.now(), owned_by: 'elvion' }
+            ]
+        });
+    }
+
     if (req.path === '/' || req.path === '/index.html' || req.path.startsWith('/auth') || req.method === 'GET') {
         return next();
     }
