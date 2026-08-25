@@ -278,9 +278,10 @@ app.use((req, res, next) => {
                 tier: {
                     id: 'free-tier',
                     name: 'Elvion Pro'
-                }
+                },
+                availableCredits: []
             },
-            cloudaicompanionProject: 'elvion-project'
+            cloudaicompanionProject: { id: 'elvion-project' }
         });
     }
 
