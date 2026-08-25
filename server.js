@@ -176,25 +176,32 @@ app.get(['/v1/models', '/api/v1/models', '/models'], (req, res) => {
         object: 'list',
         data: [
             {
-                id: AI_PROVIDERS.groq.model,
-                object: 'model',
-                created: Date.now(),
-                owned_by: 'groq',
-                name: 'Elvion Fast (Groq)'
-            },
-            {
-                id: AI_PROVIDERS.cerebras.model,
+                id: 'cerebras-gpt-oss-120b',
                 object: 'model',
                 created: Date.now(),
                 owned_by: 'cerebras',
-                name: 'Elvion Ultra (Cerebras)'
+                name: 'Elvion Ultra (Cerebras 120B)'
             },
             {
-                id: AI_PROVIDERS.groq.fallbackModel,
+                id: 'groq-gpt-oss-120b',
                 object: 'model',
                 created: Date.now(),
                 owned_by: 'groq',
-                name: 'Llama 3.3 70B (Groq)'
+                name: 'Elvion Fast (Groq 120B)'
+            },
+            {
+                id: 'llama-3.3-70b-versatile',
+                object: 'model',
+                created: Date.now(),
+                owned_by: 'groq',
+                name: 'Elvion Llama (Groq 70B)'
+            },
+            {
+                id: 'gpt-oss-120b',
+                object: 'model',
+                created: Date.now(),
+                owned_by: 'elvion',
+                name: 'Elvion 120B'
             }
         ]
     });
@@ -222,10 +229,27 @@ app.use(async (req, res, next) => {
         const isStream = req.path.includes('streamGenerateContent');
         const googlePayload = req.body;
         
-        // Dynamically select provider based on path, defaulting to activeProvider
-        const modelId = req.path.match(/models\/([^:]+)/)?.[1];
-        const isCerebras = modelId === AI_PROVIDERS.cerebras.model || (modelId === undefined && activeProvider === 'cerebras');
-        const providerConfig = isCerebras ? AI_PROVIDERS.cerebras : AI_PROVIDERS.groq;
+        // Dynamically select provider based on path / model name
+        const rawModelId = (req.path.match(/models\/([^:]+)/)?.[1] || googlePayload?.model || '').toLowerCase();
+        let providerConfig = AI_PROVIDERS.groq;
+        let actualModel = 'gpt-oss-120b';
+
+        if (rawModelId.includes('cerebras')) {
+            providerConfig = AI_PROVIDERS.cerebras;
+            actualModel = 'gpt-oss-120b';
+        } else if (rawModelId.includes('70b') || rawModelId.includes('llama')) {
+            providerConfig = AI_PROVIDERS.groq;
+            actualModel = 'llama-3.3-70b-versatile';
+        } else if (rawModelId.includes('groq')) {
+            providerConfig = AI_PROVIDERS.groq;
+            actualModel = 'gpt-oss-120b';
+        } else if (activeProvider === 'cerebras') {
+            providerConfig = AI_PROVIDERS.cerebras;
+            actualModel = 'gpt-oss-120b';
+        } else {
+            providerConfig = AI_PROVIDERS.groq;
+            actualModel = 'gpt-oss-120b';
+        }
 
         // Build OpenAI messages
         const messages = [];
@@ -242,7 +266,7 @@ app.use(async (req, res, next) => {
         }
 
         const openAIPayload = {
-            model: providerConfig.model,
+            model: actualModel,
             messages: messages,
             stream: isStream,
             temperature: 0.3
