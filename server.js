@@ -190,34 +190,37 @@ app.get(['/user/info', '/api/user/info'], async (req, res) => {
     });
 });
 
-// Status & Quota mock endpoints
-app.all([
-    '/user/status',
-    '/api/user/status',
-    '*/GetUserStatus',
-    '*/GetProfileData',
-    '*/RetrieveUserQuotaSummary'
-], (req, res) => {
-    return res.json({
-        signedIn: true,
-        userTier: {
-            name: 'Elvion Pro (Unlimited)',
-            description: 'Unlimited access to Groq & Cerebras Fast AI Models',
-            upgradeButtonText: 'Elvion Pro'
-        },
-        groups: [
-            {
-                displayName: 'Groq Models',
-                remainingFraction: 1.0,
-                description: 'Unlimited Groq Inference'
+// Status & Quota mock middleware/routes
+app.use((req, res, next) => {
+    if (
+        req.path === '/user/status' ||
+        req.path === '/api/user/status' ||
+        req.path.endsWith('/GetUserStatus') ||
+        req.path.endsWith('/GetProfileData') ||
+        req.path.endsWith('/RetrieveUserQuotaSummary')
+    ) {
+        return res.json({
+            signedIn: true,
+            userTier: {
+                name: 'Elvion Pro (Unlimited)',
+                description: 'Unlimited access to Groq & Cerebras Fast AI Models',
+                upgradeButtonText: 'Elvion Pro'
             },
-            {
-                displayName: 'Cerebras Models',
-                remainingFraction: 1.0,
-                description: 'Unlimited Cerebras Ultra Speed'
-            }
-        ]
-    });
+            groups: [
+                {
+                    displayName: 'Groq Models',
+                    remainingFraction: 1.0,
+                    description: 'Unlimited Groq Inference'
+                },
+                {
+                    displayName: 'Cerebras Models',
+                    remainingFraction: 1.0,
+                    description: 'Unlimited Cerebras Ultra Speed'
+                }
+            ]
+        });
+    }
+    next();
 });
 
 // All Available Models Endpoint (Groq + Cerebras)
