@@ -10,22 +10,57 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.raw({ type: ['application/grpc-web*', 'application/grpc*'], limit: '50mb' }));
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Google OAuth 2.0
+// Google OAuth 2.0 Credentials from Environment
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const REDIRECT_URI = process.env.REDIRECT_URI || 'https://elvion-auth.onrender.com/auth/google/callback';
 
+// AI Providers configuration from Environment
+const AI_PROVIDERS = {
+    groq: {
+        baseUrl: 'https://api.groq.com/openai/v1',
+        apiKey: process.env.GROQ_API_KEY || '',
+        models: [
+            'openai/gpt-oss-120b',
+            'openai/gpt-oss-20b',
+            'qwen/qwen3.6-27b',
+            'groq/compound',
+            'llama-3.3-70b-versatile',
+            'llama-3.1-8b-instant'
+        ]
+    },
+    cerebras: {
+        baseUrl: 'https://api.cerebras.ai/v1',
+        apiKey: process.env.CEREBRAS_API_KEY || '',
+        models: [
+            'gpt-oss-120b',
+            'gemma-4-31b'
+        ]
+    }
+};
+
+let activeProvider = process.env.DEFAULT_PROVIDER || 'groq';
+
+const SYSTEM_PROMPT = `You are Elvion AI, a world-class coding assistant inside Elvion IDE. Provide high quality, concise, and clean code. Answer directly and cleanly.`;
+
+// Google OAuth Routes
 app.get('/auth/google', (req, res) => {
+    if (!GOOGLE_CLIENT_ID) {
+        return res.status(500).send('GOOGLE_CLIENT_ID environment variable is missing.');
+    }
     const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
         + '?client_id=' + encodeURIComponent(GOOGLE_CLIENT_ID)
         + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
         + '&response_type=code'
-        + '&scope=' + encodeURIComponent('openid email profile');
+        + '&scope=' + encodeURIComponent('openid email profile')
+        + '&access_type=offline'
+        + '&prompt=consent';
     res.redirect(authUrl);
 });
 
@@ -49,15 +84,14 @@ app.get('/auth/google/callback', async (req, res) => {
         const tokenData = await tokenResponse.json();
 
         if (tokenData.access_token) {
-            // Google userinfo API dan email, name, picture olish
             const userInfoResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
                 headers: { Authorization: `Bearer ${tokenData.access_token}` }
             });
             const userInfo = await userInfoResp.json();
 
-            // Barcha ma'lumotlarni birga JSON encode qilib deep link ga yuborish
             const payload = JSON.stringify({
                 token: tokenData.access_token,
+                refresh_token: tokenData.refresh_token || '',
                 email: userInfo.email || '',
                 name: userInfo.name || '',
                 picture: userInfo.picture || '',
@@ -67,6 +101,7 @@ app.get('/auth/google/callback', async (req, res) => {
             const redirectUrl = `/auth-success?token=${encodedPayload}`;
             return res.redirect(redirectUrl);
         } else {
+            console.error('OAuth Token exchange failed:', tokenData);
             return res.redirect('/?error=token_failed');
         }
     } catch (err) {
@@ -75,7 +110,6 @@ app.get('/auth/google/callback', async (req, res) => {
     }
 });
 
-// New route handling auth success UI
 app.get('/auth-success', (req, res) => {
     const token = req.query.token || '';
     const authUri = `elvion-ide://auth-success?token=${encodeURIComponent(token)}`;
@@ -84,21 +118,20 @@ app.get('/auth-success', (req, res) => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Auth Success — Open Elvion IDE</title>
+<title>Auth Success — Elvion IDE</title>
 <link rel="icon" href="/logo.png" type="image/png">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#080b14;--surface:rgba(15,20,35,0.85);--border:rgba(100,130,255,0.08);--accent:#4f6ef7;--accent2:#7c5bf5;--text:#e8ecf4;--text2:#8893a7;--success:#22c55e;}
+:root{--bg:#080b14;--surface:rgba(15,20,35,0.85);--border:rgba(100,130,255,0.1);--accent:#7c5bf5;--accent2:#9d4edd;--text:#e8ecf4;--text2:#8893a7;--success:#22c55e;}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center}
-.card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px 40px;text-align:center;backdrop-filter:blur(40px);box-shadow:0 0 80px rgba(79,110,247,0.1),0 32px 64px rgba(0,0,0,0.5)}
+.card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px 40px;text-align:center;backdrop-filter:blur(40px);box-shadow:0 0 80px rgba(124,91,245,0.15),0 32px 64px rgba(0,0,0,0.5)}
 .icon-wrap{width:72px;height:72px;margin:0 auto 24px;border-radius:50%;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center}
 .icon-wrap svg{width:36px;height:36px;stroke:var(--success);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-h1{font-size:24px;font-weight:700;margin-bottom:8px;letter-spacing:-0.5px}
+h1{font-size:24px;font-weight:700;margin-bottom:8px;}
 p{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.6}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 24px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 8px 32px rgba(79,110,247,0.3);transition:transform .2s,box-shadow .2s}
-.btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(79,110,247,0.4)}
-.btn:active{transform:translateY(0)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 24px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 8px 32px rgba(124,91,245,0.3);transition:transform .2s}
+.btn:hover{transform:translateY(-2px)}
 .hint{font-size:12px;color:var(--text2);margin-top:20px}
 </style>
 </head>
@@ -108,10 +141,9 @@ p{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.6}
     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
   </div>
   <h1>Authentication Successful</h1>
-  <p>Your Google account has been connected to Elvion.<br>Opening Elvion IDE now...</p>
+  <p>Your Google account has been connected to Elvion IDE.<br>Opening Elvion IDE now...</p>
   <a href="${authUri}" class="btn" id="openBtn">
     <span>Open Elvion IDE</span>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
   </a>
   <div class="hint">If the app doesn't open automatically, click the button above.</div>
 </div>
@@ -122,147 +154,219 @@ window.location.href = "${authUri}";
 </html>`);
 });
 
-// Language Server token bilan shu endpoint ga keladi va user ma'lumotlarini oladi
-app.get('/user/info', async (req, res) => {
+// User Info & Session endpoints
+app.get(['/user/info', '/api/user/info'], async (req, res) => {
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.replace('Bearer ', '').trim();
     if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
+        return res.json({
+            email: 'user@elvion.dev',
+            name: 'Elvion Developer',
+            picture: '',
+            id: '1'
+        });
     }
     try {
         const userInfoResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
             headers: { Authorization: `Bearer ${token}` }
         });
-        if (!userInfoResp.ok) {
-            return res.status(userInfoResp.status).json({ error: 'Failed to fetch user info' });
+        if (userInfoResp.ok) {
+            const userInfo = await userInfoResp.json();
+            return res.json({
+                email: userInfo.email || 'user@elvion.dev',
+                name: userInfo.name || 'Elvion Developer',
+                picture: userInfo.picture || '',
+                id: userInfo.id || '1'
+            });
         }
-        const userInfo = await userInfoResp.json();
-        return res.json({
-            email: userInfo.email || '',
-            name: userInfo.name || '',
-            picture: userInfo.picture || '',
-            id: userInfo.id || ''
-        });
     } catch (err) {
-        console.error('[Elvion-Auth] /user/info error:', err);
-        return res.status(500).json({ error: err.message });
+        console.warn('Google userinfo fetch failed:', err.message);
     }
+    return res.json({
+        email: 'user@elvion.dev',
+        name: 'Elvion Developer',
+        picture: '',
+        id: '1'
+    });
 });
 
-
-// AI Configuration
-const AI_PROVIDERS = {
-    groq: {
-        baseUrl: 'https://api.groq.com/openai/v1',
-        model: 'gpt-oss-120b',
-        fallbackModel: 'llama-3.3-70b-versatile',
-        apiKey: process.env.GROQ_API_KEY || ''
-    },
-    cerebras: {
-        baseUrl: 'https://api.cerebras.ai/v1',
-        model: 'gpt-oss-120b',
-        fallbackModel: 'llama-3.3-70b',
-        apiKey: process.env.CEREBRAS_API_KEY || ''
-    }
-};
-
-let activeProvider = 'groq';
-
-const SYSTEM_PROMPT = `You are Elvion AI, an advanced intelligent coding assistant integrated into the Elvion IDE. Your goal is to provide precise, accurate, and helpful answers to the developer. Provide fully functional, clean, and elegant code. Do not add unnecessary fluff, but be polite and clear.`;
-
-// Models endpoint — alohida GET route
-app.get(['/v1/models', '/api/v1/models', '/models'], (req, res) => {
+// Status & Quota mock endpoints
+app.all([
+    '/user/status',
+    '/api/user/status',
+    '*/GetUserStatus',
+    '*/GetProfileData',
+    '*/RetrieveUserQuotaSummary'
+], (req, res) => {
     return res.json({
-        object: 'list',
-        data: [
+        signedIn: true,
+        userTier: {
+            name: 'Elvion Pro (Unlimited)',
+            description: 'Unlimited access to Groq & Cerebras Fast AI Models',
+            upgradeButtonText: 'Elvion Pro'
+        },
+        groups: [
             {
-                id: 'cerebras-gpt-oss-120b',
-                object: 'model',
-                created: Date.now(),
-                owned_by: 'cerebras',
-                name: 'Elvion Ultra (Cerebras 120B)'
+                displayName: 'Groq Models',
+                remainingFraction: 1.0,
+                description: 'Unlimited Groq Inference'
             },
             {
-                id: 'groq-gpt-oss-120b',
-                object: 'model',
-                created: Date.now(),
-                owned_by: 'groq',
-                name: 'Elvion Fast (Groq 120B)'
-            },
-            {
-                id: 'llama-3.3-70b-versatile',
-                object: 'model',
-                created: Date.now(),
-                owned_by: 'groq',
-                name: 'Elvion Llama (Groq 70B)'
-            },
-            {
-                id: 'gpt-oss-120b',
-                object: 'model',
-                created: Date.now(),
-                owned_by: 'elvion',
-                name: 'Elvion 120B'
+                displayName: 'Cerebras Models',
+                remainingFraction: 1.0,
+                description: 'Unlimited Cerebras Ultra Speed'
             }
         ]
     });
 });
 
-app.post('/switch-provider', (req, res) => {
-    const provider = req.body?.provider;
-    if (provider && AI_PROVIDERS[provider]) {
-        activeProvider = provider;
-        res.json({ success: true, activeProvider });
-    } else {
-        res.status(400).json({ error: 'Invalid provider' });
-    }
+// All Available Models Endpoint (Groq + Cerebras)
+app.get(['/v1/models', '/api/v1/models', '/models'], (req, res) => {
+    return res.json({
+        object: 'list',
+        data: [
+            // Cerebras Models
+            {
+                id: 'cerebras/gpt-oss-120b',
+                object: 'model',
+                owned_by: 'cerebras',
+                name: 'Elvion Ultra 120B (Cerebras ~3000 t/s)'
+            },
+            {
+                id: 'cerebras/gemma-4-31b',
+                object: 'model',
+                owned_by: 'cerebras',
+                name: 'Elvion Gemma 31B (Cerebras)'
+            },
+            // Groq Models
+            {
+                id: 'groq/gpt-oss-120b',
+                object: 'model',
+                owned_by: 'groq',
+                name: 'Elvion Fast 120B (Groq)'
+            },
+            {
+                id: 'groq/gpt-oss-20b',
+                object: 'model',
+                owned_by: 'groq',
+                name: 'Elvion Compact 20B (Groq)'
+            },
+            {
+                id: 'groq/qwen3.6-27b',
+                object: 'model',
+                owned_by: 'groq',
+                name: 'Elvion Qwen 3.6 27B (Groq)'
+            },
+            {
+                id: 'groq/compound',
+                object: 'model',
+                owned_by: 'groq',
+                name: 'Elvion Compound System (Groq)'
+            },
+            {
+                id: 'groq/llama-3.3-70b-versatile',
+                object: 'model',
+                owned_by: 'groq',
+                name: 'Elvion Llama 3.3 70B (Groq)'
+            },
+            // Direct alias
+            {
+                id: 'gpt-oss-120b',
+                object: 'model',
+                owned_by: 'elvion',
+                name: 'GPT-OSS 120B (Default)'
+            }
+        ]
+    });
 });
 
-// AI Translator (Google -> OpenAI)
+// Helper to determine AI provider & model from request
+function resolveProviderAndModel(requestedModel) {
+    const m = (requestedModel || '').toLowerCase();
+
+    if (m.includes('cerebras') || m.includes('gemma')) {
+        return {
+            provider: AI_PROVIDERS.cerebras,
+            model: m.includes('gemma') ? 'gemma-4-31b' : 'gpt-oss-120b'
+        };
+    }
+
+    if (m.includes('20b')) {
+        return {
+            provider: AI_PROVIDERS.groq,
+            model: 'openai/gpt-oss-20b'
+        };
+    }
+
+    if (m.includes('qwen')) {
+        return {
+            provider: AI_PROVIDERS.groq,
+            model: 'qwen/qwen3.6-27b'
+        };
+    }
+
+    if (m.includes('compound')) {
+        return {
+            provider: AI_PROVIDERS.groq,
+            model: 'groq/compound'
+        };
+    }
+
+    if (m.includes('llama') || m.includes('70b')) {
+        return {
+            provider: AI_PROVIDERS.groq,
+            model: 'llama-3.3-70b-versatile'
+        };
+    }
+
+    if (activeProvider === 'cerebras') {
+        return {
+            provider: AI_PROVIDERS.cerebras,
+            model: 'gpt-oss-120b'
+        };
+    }
+
+    return {
+        provider: AI_PROVIDERS.groq,
+        model: 'openai/gpt-oss-120b'
+    };
+}
+
+// AI Completion & Chat Translation Layer (Google / REST / OpenAI -> Groq & Cerebras)
 app.use(async (req, res, next) => {
-    if (req.path === '/' || req.path === '/index.html' || req.path.startsWith('/auth') || req.path === '/user/info' || req.method === 'GET') {
+    if (req.method === 'GET' || req.path === '/' || req.path.startsWith('/auth')) {
         return next();
     }
 
     try {
-        console.log('[Elvion-Auth] AI Request Intercepted: ' + req.method + ' ' + req.path);
+        console.log(`[Elvion-Auth] Intercepted: ${req.method} ${req.path}`);
 
-        const isStream = req.path.includes('streamGenerateContent');
-        const googlePayload = req.body;
-        
-        // Dynamically select provider based on path / model name
-        const rawModelId = (req.path.match(/models\/([^:]+)/)?.[1] || googlePayload?.model || '').toLowerCase();
-        let providerConfig = AI_PROVIDERS.groq;
-        let actualModel = 'gpt-oss-120b';
+        const isStream = req.path.includes('stream') || req.headers['accept']?.includes('text/event-stream');
+        const body = req.body || {};
 
-        if (rawModelId.includes('cerebras')) {
-            providerConfig = AI_PROVIDERS.cerebras;
-            actualModel = 'gpt-oss-120b';
-        } else if (rawModelId.includes('70b') || rawModelId.includes('llama')) {
-            providerConfig = AI_PROVIDERS.groq;
-            actualModel = 'llama-3.3-70b-versatile';
-        } else if (rawModelId.includes('groq')) {
-            providerConfig = AI_PROVIDERS.groq;
-            actualModel = 'gpt-oss-120b';
-        } else if (activeProvider === 'cerebras') {
-            providerConfig = AI_PROVIDERS.cerebras;
-            actualModel = 'gpt-oss-120b';
-        } else {
-            providerConfig = AI_PROVIDERS.groq;
-            actualModel = 'gpt-oss-120b';
+        const requestedModel = (req.path.match(/models\/([^:]+)/)?.[1] || body.model || '').toLowerCase();
+        const { provider, model: actualModel } = resolveProviderAndModel(requestedModel);
+
+        if (!provider.apiKey) {
+            console.error(`[Elvion-Auth] API Key missing for provider`);
+            return res.status(500).json({ error: 'AI Provider API Key is not set in Environment Variables.' });
         }
 
-        // Build OpenAI messages
         const messages = [];
         messages.push({ role: 'system', content: SYSTEM_PROMPT });
 
-        if (googlePayload && googlePayload.contents) {
-            for (const content of googlePayload.contents) {
-                const role = content.role === 'model' ? 'assistant' : 'user';
-                const text = content.parts ? content.parts.map(p => p.text).join('\n') : '';
-                messages.push({ role, content: text });
+        if (body.contents && Array.isArray(body.contents)) {
+            for (const item of body.contents) {
+                const role = item.role === 'model' ? 'assistant' : 'user';
+                const text = item.parts ? item.parts.map(p => p.text || '').join('\n') : '';
+                if (text) messages.push({ role, content: text });
             }
+        } else if (body.messages && Array.isArray(body.messages)) {
+            messages.push(...body.messages);
+        } else if (typeof body === 'string') {
+            messages.push({ role: 'user', content: body });
         } else {
-            messages.push({ role: 'user', content: JSON.stringify(googlePayload) });
+            messages.push({ role: 'user', content: JSON.stringify(body) });
         }
 
         const openAIPayload = {
@@ -272,27 +376,27 @@ app.use(async (req, res, next) => {
             temperature: 0.3
         };
 
-        const response = await fetch(providerConfig.baseUrl + '/chat/completions', {
+        const upstreamResponse = await fetch(`${provider.baseUrl}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + providerConfig.apiKey
+                'Authorization': `Bearer ${provider.apiKey}`
             },
             body: JSON.stringify(openAIPayload)
         });
 
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error('[AI Bridge] Upstream error from ' + (isCerebras ? 'Cerebras' : 'Groq') + ':', errText);
-            return res.status(response.status).json({ error: errText });
+        if (!upstreamResponse.ok) {
+            const errText = await upstreamResponse.text();
+            console.error(`[Elvion-Auth] Upstream error from ${provider.baseUrl}:`, errText);
+            return res.status(upstreamResponse.status).json({ error: errText });
         }
 
         if (isStream) {
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Transfer-Encoding', 'chunked');
+            res.setHeader('Connection', 'keep-alive');
 
-            const reader = response.body.getReader();
+            const reader = upstreamResponse.body.getReader();
             const decoder = new TextDecoder();
 
             while (true) {
@@ -303,31 +407,29 @@ app.use(async (req, res, next) => {
                 const lines = chunk.split('\n');
 
                 for (const line of lines) {
-                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
                         try {
                             const data = JSON.parse(line.slice(6));
-                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
-                                const text = data.choices[0].delta.content;
+                            const text = data.choices?.[0]?.delta?.content || '';
+                            if (text) {
                                 const googleChunk = {
                                     candidates: [{
                                         content: { parts: [{ text }] },
                                         finishReason: null
                                     }]
                                 };
-                                // Google streamGenerateContent format: JSON array items as SSE
                                 res.write(`data: ${JSON.stringify(googleChunk)}\n\n`);
                             }
-                        } catch (e) { /* ignore parse errors */ }
+                        } catch (e) {}
                     }
                 }
             }
             res.write('data: [DONE]\n\n');
             res.end();
         } else {
-            const data = await response.json();
-            const textContent = data.choices[0].message.content;
+            const data = await upstreamResponse.json();
+            const textContent = data.choices?.[0]?.message?.content || '';
 
-            // Translate back to Google format
             const googleResponse = {
                 candidates: [{
                     content: { parts: [{ text: textContent }] },
@@ -343,5 +445,5 @@ app.use(async (req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log('Elvion-Auth Server running on port ' + PORT);
+    console.log(`Elvion-Auth Multi-Model Server running on port ${PORT}`);
 });
