@@ -253,14 +253,22 @@ app.use((req, res, next) => {
         const modelsMap = {};
         const groqModelIds = [];
         const cerebrasModelIds = [];
-        
+
         ALL_MODELS.forEach(m => {
             const mId = m.id.includes('/') ? m.id.split('/')[1] : m.id;
             modelsMap[mId] = {
+                name: mId,
                 displayName: m.name,
-                model: m.id,
-                tagTitle: m.owned_by === 'cerebras' ? 'Ultra' : 'Fast',
-                tagDescription: m.owned_by
+                description: m.name,
+                provider: m.owned_by,
+                capabilities: {
+                    supportsChat: true,
+                    supportsCompletion: true,
+                    supportsAgentMode: true
+                },
+                defaultOn: mId === 'gpt-oss-120b',
+                hardLimit: 0,
+                softLimit: 0
             };
             if (m.owned_by === 'cerebras') cerebrasModelIds.push(mId);
             else groqModelIds.push(mId);
@@ -272,12 +280,13 @@ app.use((req, res, next) => {
                 {
                     displayName: 'Elvion AI Models',
                     groups: [
-                        { displayName: 'Cerebras Ultra', modelIds: cerebrasModelIds },
-                        { displayName: 'Groq Fast', modelIds: groqModelIds }
+                        { displayName: 'Cerebras Ultra Speed', modelIds: cerebrasModelIds },
+                        { displayName: 'Groq Fast Inference', modelIds: groqModelIds }
                     ]
                 }
             ],
-            defaultAgentModelId: 'gpt-oss-120b'
+            defaultAgentModelId: 'gpt-oss-120b',
+            defaultCompletionModelId: 'gpt-oss-20b'
         });
     }
 
@@ -336,6 +345,16 @@ app.use((req, res, next) => {
     // NUXes (onboarding hints) - return empty so IDE doesn't spam errors
     if (p.includes('googleAgentNuxes') || p.includes('getCascadeNuxes') || p.includes('Nuxes') || p.includes('nuxes')) {
         return res.json({ nuxes: [] });
+    }
+
+    // buildWithGooglePlugins - plugin list for language server
+    if (p.includes('buildWithGooglePlugins')) {
+        return res.json({ plugins: [], nextPageToken: '' });
+    }
+
+    // listPlugins / getPlugins
+    if (p.includes('listPlugins') || p.includes('getPlugins') || p.includes('Plugins')) {
+        return res.json({ plugins: [], nextPageToken: '' });
     }
 
     // Experiments - return empty list
