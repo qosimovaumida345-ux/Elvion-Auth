@@ -54,7 +54,6 @@ const SYSTEM_PROMPT = `You are Elvion AI, a world-class coding assistant inside 
 
 // List of all custom models
 const ALL_MODELS = [
-    // Cerebras Models
     {
         id: 'cerebras/gpt-oss-120b',
         object: 'model',
@@ -67,7 +66,6 @@ const ALL_MODELS = [
         owned_by: 'cerebras',
         name: 'Elvion Gemma 31B (Cerebras)'
     },
-    // Groq Models
     {
         id: 'groq/gpt-oss-120b',
         object: 'model',
@@ -98,7 +96,6 @@ const ALL_MODELS = [
         owned_by: 'groq',
         name: 'Elvion Llama 3.3 70B (Groq)'
     },
-    // Direct alias
     {
         id: 'gpt-oss-120b',
         object: 'model',
@@ -213,7 +210,7 @@ window.location.href = "${authUri}";
 });
 
 // User Info & Session endpoints
-app.get(['/user/info', '/api/user/info'], async (req, res) => {
+app.get(['/user/info', '/api/user/info', '/oauth2/v2/userinfo'], async (req, res) => {
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.replace('Bearer ', '').trim();
     if (!token) {
@@ -252,24 +249,26 @@ app.get(['/user/info', '/api/user/info'], async (req, res) => {
 app.use((req, res, next) => {
     const p = req.path;
 
-    if (p.includes('getAvailableModels') || p === '/v1/models' || p === '/api/v1/models' || p === '/models') {
+    if (p.includes('fetchAvailableModels') || p.includes('getAvailableModels') || p === '/v1/models' || p === '/api/v1/models' || p === '/models') {
         return res.json({
             object: 'list',
-            data: ALL_MODELS
+            data: ALL_MODELS,
+            models: ALL_MODELS,
+            availableModels: ALL_MODELS
         });
     }
 
     if (p.includes('loadCodeAssist')) {
         return res.json({
             currentTier: {
-                id: 'tier_elvion_pro',
+                id: 'free-tier',
                 name: 'Elvion Pro',
                 description: 'Unlimited access to Groq & Cerebras AI Models',
                 isDefault: true
             },
             allowedTiers: [
                 {
-                    id: 'tier_elvion_pro',
+                    id: 'free-tier',
                     name: 'Elvion Pro',
                     description: 'Unlimited access to Groq & Cerebras AI Models',
                     isDefault: true
@@ -277,11 +276,27 @@ app.use((req, res, next) => {
             ],
             paidTier: {
                 tier: {
-                    id: 'tier_elvion_pro',
+                    id: 'free-tier',
                     name: 'Elvion Pro'
                 }
             },
             cloudaicompanionProject: 'elvion-project'
+        });
+    }
+
+    if (p.includes('fetchUserInfo') || p.includes('getUserAccountSettings')) {
+        return res.json({
+            userSettings: {
+                tier: 'free-tier'
+            },
+            email: 'user@elvion.dev',
+            name: 'Elvion Developer'
+        });
+    }
+
+    if (p.includes('fetchAdminControls')) {
+        return res.json({
+            adminControls: {}
         });
     }
 
