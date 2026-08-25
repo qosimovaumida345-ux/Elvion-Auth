@@ -328,11 +328,64 @@ app.use((req, res, next) => {
         return res.json({
             done: true,
             response: {
-                cloudaicompanionProject: {
-                    id: 'elvion-project'
-                }
+                cloudaicompanionProject: 'elvion-project'
             }
         });
+    }
+
+    // NUXes (onboarding hints) - return empty so IDE doesn't spam errors
+    if (p.includes('googleAgentNuxes') || p.includes('getCascadeNuxes') || p.includes('Nuxes') || p.includes('nuxes')) {
+        return res.json({ nuxes: [] });
+    }
+
+    // Experiments - return empty list
+    if (p.includes('listExperiments') || p.includes('Experiments')) {
+        return res.json({ experiments: [] });
+    }
+
+    // Agents list
+    if (p.includes('listAgents')) {
+        return res.json({ agents: [] });
+    }
+
+    // User quota
+    if (p.includes('retrieveUserQuota') || p.includes('UserQuota')) {
+        return res.json({
+            quota: {
+                totalCredits: 999999,
+                usedCredits: 0,
+                remainingCredits: 999999
+            }
+        });
+    }
+
+    // User settings
+    if (p.includes('getCodeAssistGlobalUserSetting') || p.includes('setCodeAssistGlobalUserSetting') || p.includes('getUserAccountSettings') || p.includes('setUserSettings')) {
+        return res.json({ settings: {} });
+    }
+
+    // fetchUserInfo
+    if (p.includes('fetchUserInfo')) {
+        return res.json({
+            email: 'user@elvion.dev',
+            name: 'Elvion Developer',
+            id: '1'
+        });
+    }
+
+    // listCloudAICompanionProjects
+    if (p.includes('listCloudAICompanionProjects')) {
+        return res.json({ projects: [] });
+    }
+
+    // listModelConfigs
+    if (p.includes('listModelConfigs')) {
+        return res.json({ modelConfigs: [] });
+    }
+
+    // recordClientEvent, recordCodeAssistMetrics, recordSmartchoicesFeedback, recordTrajectoryAnalytics, registerInteraction, uploadPerformanceProfile
+    if (p.includes('record') || p.includes('Record') || p.includes('register') || p.includes('Register') || p.includes('upload') || p.includes('Upload') || p.includes('write') || p.includes('Write')) {
+        return res.json({ success: true });
     }
 
     if (
