@@ -250,11 +250,34 @@ app.use((req, res, next) => {
     const p = req.path;
 
     if (p.includes('fetchAvailableModels') || p.includes('getAvailableModels') || p === '/v1/models' || p === '/api/v1/models' || p === '/models') {
+        const modelsMap = {};
+        const groqModelIds = [];
+        const cerebrasModelIds = [];
+        
+        ALL_MODELS.forEach(m => {
+            const mId = m.id.includes('/') ? m.id.split('/')[1] : m.id;
+            modelsMap[mId] = {
+                displayName: m.name,
+                model: m.id,
+                tagTitle: m.owned_by === 'cerebras' ? 'Ultra' : 'Fast',
+                tagDescription: m.owned_by
+            };
+            if (m.owned_by === 'cerebras') cerebrasModelIds.push(mId);
+            else groqModelIds.push(mId);
+        });
+
         return res.json({
-            object: 'list',
-            data: ALL_MODELS,
-            models: ALL_MODELS,
-            availableModels: ALL_MODELS
+            models: modelsMap,
+            agentModelSorts: [
+                {
+                    displayName: 'Elvion AI Models',
+                    groups: [
+                        { displayName: 'Cerebras Ultra', modelIds: cerebrasModelIds },
+                        { displayName: 'Groq Fast', modelIds: groqModelIds }
+                    ]
+                }
+            ],
+            defaultAgentModelId: 'gpt-oss-120b'
         });
     }
 
