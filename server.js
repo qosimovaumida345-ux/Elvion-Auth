@@ -304,7 +304,7 @@ app.use((req, res, next) => {
                 },
                 availableCredits: []
             },
-            cloudaicompanionProject: { id: 'elvion-project' }
+            cloudaicompanionProject: 'elvion-project'
         });
     }
 
