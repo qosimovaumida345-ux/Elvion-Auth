@@ -326,9 +326,11 @@ app.use((req, res, next) => {
 
     if (p.includes('onboardUser')) {
         return res.json({
-            status: 'SUCCESS',
-            cloudaicompanionProject: {
-                id: 'elvion-project'
+            done: true,
+            response: {
+                cloudaicompanionProject: {
+                    id: 'elvion-project'
+                }
             }
         });
     }
