@@ -16,6 +16,9 @@ app.use(express.raw({ type: ['application/grpc-web*', 'application/grpc*'], limi
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get(['/privacy', '/privacy-policy'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'privacy.html')));
+app.get(['/terms', '/terms-of-service'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'terms.html')));
+
 // Google OAuth 2.0 Credentials from Environment
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
