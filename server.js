@@ -255,7 +255,7 @@ app.use((req, res, next) => {
         const cerebrasModelIds = [];
 
         ALL_MODELS.forEach(m => {
-            const mId = m.id.includes('/') ? m.id.split('/')[1] : m.id;
+            const mId = m.id; // Use full ID e.g. groq/gpt-oss-120b
             modelsMap[mId] = {
                 name: mId,
                 displayName: m.name,
@@ -266,7 +266,7 @@ app.use((req, res, next) => {
                     supportsCompletion: true,
                     supportsAgentMode: true
                 },
-                defaultOn: mId === 'gpt-oss-120b',
+                defaultOn: mId === 'groq/gpt-oss-120b',
                 hardLimit: 0,
                 softLimit: 0
             };
@@ -285,8 +285,8 @@ app.use((req, res, next) => {
                     ]
                 }
             ],
-            defaultAgentModelId: 'gpt-oss-120b',
-            defaultCompletionModelId: 'gpt-oss-20b'
+            defaultAgentModelId: 'groq/gpt-oss-120b',
+            defaultCompletionModelId: 'groq/gpt-oss-20b'
         });
     }
 
@@ -313,7 +313,9 @@ app.use((req, res, next) => {
                 },
                 availableCredits: []
             },
-            cloudaicompanionProject: 'elvion-project'
+            cloudaicompanionProject: 'elvion-project',
+            project: 'elvion-project',
+            status: 1
         });
     }
 
