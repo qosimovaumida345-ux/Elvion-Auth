@@ -49,6 +49,61 @@ let activeProvider = process.env.DEFAULT_PROVIDER || 'groq';
 
 const SYSTEM_PROMPT = `You are Elvion AI, a world-class coding assistant inside Elvion IDE. Provide high quality, concise, and clean code. Answer directly and cleanly.`;
 
+// List of all custom models
+const ALL_MODELS = [
+    // Cerebras Models
+    {
+        id: 'cerebras/gpt-oss-120b',
+        object: 'model',
+        owned_by: 'cerebras',
+        name: 'Elvion Ultra 120B (Cerebras ~3000 t/s)'
+    },
+    {
+        id: 'cerebras/gemma-4-31b',
+        object: 'model',
+        owned_by: 'cerebras',
+        name: 'Elvion Gemma 31B (Cerebras)'
+    },
+    // Groq Models
+    {
+        id: 'groq/gpt-oss-120b',
+        object: 'model',
+        owned_by: 'groq',
+        name: 'Elvion Fast 120B (Groq)'
+    },
+    {
+        id: 'groq/gpt-oss-20b',
+        object: 'model',
+        owned_by: 'groq',
+        name: 'Elvion Compact 20B (Groq)'
+    },
+    {
+        id: 'groq/qwen3.6-27b',
+        object: 'model',
+        owned_by: 'groq',
+        name: 'Elvion Qwen 3.6 27B (Groq)'
+    },
+    {
+        id: 'groq/compound',
+        object: 'model',
+        owned_by: 'groq',
+        name: 'Elvion Compound System (Groq)'
+    },
+    {
+        id: 'groq/llama-3.3-70b-versatile',
+        object: 'model',
+        owned_by: 'groq',
+        name: 'Elvion Llama 3.3 70B (Groq)'
+    },
+    // Direct alias
+    {
+        id: 'gpt-oss-120b',
+        object: 'model',
+        owned_by: 'elvion',
+        name: 'GPT-OSS 120B (Default)'
+    }
+];
+
 // Google OAuth Routes
 app.get('/auth/google', (req, res) => {
     if (!GOOGLE_CLIENT_ID) {
@@ -190,9 +245,16 @@ app.get(['/user/info', '/api/user/info'], async (req, res) => {
     });
 });
 
-// CloudCode Onboarding and Tier Handlers (v1internal)
+// CloudCode Onboarding, Tier Handlers, Models & Status
 app.use((req, res, next) => {
     const p = req.path;
+
+    if (p.includes('getAvailableModels') || p === '/v1/models' || p === '/api/v1/models' || p === '/models') {
+        return res.json({
+            object: 'list',
+            data: ALL_MODELS
+        });
+    }
 
     if (p.includes('loadCodeAssist')) {
         return res.json({
@@ -259,66 +321,6 @@ app.use((req, res, next) => {
     }
 
     next();
-});
-
-// All Available Models Endpoint (Groq + Cerebras)
-app.get(['/v1/models', '/api/v1/models', '/models', '*getAvailableModels*'], (req, res) => {
-    return res.json({
-        object: 'list',
-        data: [
-            // Cerebras Models
-            {
-                id: 'cerebras/gpt-oss-120b',
-                object: 'model',
-                owned_by: 'cerebras',
-                name: 'Elvion Ultra 120B (Cerebras ~3000 t/s)'
-            },
-            {
-                id: 'cerebras/gemma-4-31b',
-                object: 'model',
-                owned_by: 'cerebras',
-                name: 'Elvion Gemma 31B (Cerebras)'
-            },
-            // Groq Models
-            {
-                id: 'groq/gpt-oss-120b',
-                object: 'model',
-                owned_by: 'groq',
-                name: 'Elvion Fast 120B (Groq)'
-            },
-            {
-                id: 'groq/gpt-oss-20b',
-                object: 'model',
-                owned_by: 'groq',
-                name: 'Elvion Compact 20B (Groq)'
-            },
-            {
-                id: 'groq/qwen3.6-27b',
-                object: 'model',
-                owned_by: 'groq',
-                name: 'Elvion Qwen 3.6 27B (Groq)'
-            },
-            {
-                id: 'groq/compound',
-                object: 'model',
-                owned_by: 'groq',
-                name: 'Elvion Compound System (Groq)'
-            },
-            {
-                id: 'groq/llama-3.3-70b-versatile',
-                object: 'model',
-                owned_by: 'groq',
-                name: 'Elvion Llama 3.3 70B (Groq)'
-            },
-            // Direct alias
-            {
-                id: 'gpt-oss-120b',
-                object: 'model',
-                owned_by: 'elvion',
-                name: 'GPT-OSS 120B (Default)'
-            }
-        ]
-    });
 });
 
 // Helper to determine AI provider & model from request
