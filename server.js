@@ -257,7 +257,7 @@ app.use((req, res, next) => {
         ALL_MODELS.forEach(m => {
             const mId = m.id; // Use full ID e.g. groq/gpt-oss-120b
             modelsMap[mId] = {
-                name: mId,
+                model: mId,
                 displayName: m.name,
                 description: m.name,
                 provider: m.owned_by,
