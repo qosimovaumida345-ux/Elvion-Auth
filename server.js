@@ -190,14 +190,51 @@ app.get(['/user/info', '/api/user/info'], async (req, res) => {
     });
 });
 
-// Status & Quota mock middleware/routes
+// CloudCode Onboarding and Tier Handlers (v1internal)
 app.use((req, res, next) => {
+    const p = req.path;
+
+    if (p.includes('loadCodeAssist')) {
+        return res.json({
+            currentTier: {
+                id: 'tier_elvion_pro',
+                name: 'Elvion Pro',
+                description: 'Unlimited access to Groq & Cerebras AI Models',
+                isDefault: true
+            },
+            allowedTiers: [
+                {
+                    id: 'tier_elvion_pro',
+                    name: 'Elvion Pro',
+                    description: 'Unlimited access to Groq & Cerebras AI Models',
+                    isDefault: true
+                }
+            ],
+            paidTier: {
+                tier: {
+                    id: 'tier_elvion_pro',
+                    name: 'Elvion Pro'
+                }
+            },
+            cloudaicompanionProject: 'elvion-project'
+        });
+    }
+
+    if (p.includes('onboardUser')) {
+        return res.json({
+            status: 'SUCCESS',
+            cloudaicompanionProject: {
+                id: 'elvion-project'
+            }
+        });
+    }
+
     if (
-        req.path === '/user/status' ||
-        req.path === '/api/user/status' ||
-        req.path.endsWith('/GetUserStatus') ||
-        req.path.endsWith('/GetProfileData') ||
-        req.path.endsWith('/RetrieveUserQuotaSummary')
+        p === '/user/status' ||
+        p === '/api/user/status' ||
+        p.endsWith('/GetUserStatus') ||
+        p.endsWith('/GetProfileData') ||
+        p.endsWith('/RetrieveUserQuotaSummary')
     ) {
         return res.json({
             signedIn: true,
@@ -220,11 +257,12 @@ app.use((req, res, next) => {
             ]
         });
     }
+
     next();
 });
 
 // All Available Models Endpoint (Groq + Cerebras)
-app.get(['/v1/models', '/api/v1/models', '/models'], (req, res) => {
+app.get(['/v1/models', '/api/v1/models', '/models', '*getAvailableModels*'], (req, res) => {
     return res.json({
         object: 'list',
         data: [
