@@ -25,7 +25,7 @@ app.get('/auth/google', (req, res) => {
         + '?client_id=' + encodeURIComponent(GOOGLE_CLIENT_ID)
         + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
         + '&response_type=code'
-        + '&scope=' + encodeURIComponent('email profile');
+        + '&scope=' + encodeURIComponent('openid email profile');
     res.redirect(authUrl);
 });
 
@@ -49,8 +49,22 @@ app.get('/auth/google/callback', async (req, res) => {
         const tokenData = await tokenResponse.json();
 
         if (tokenData.access_token) {
-            // Redirect to the new auth-success endpoint with token as query param
-            const redirectUrl = `/auth-success?token=${encodeURIComponent(tokenData.access_token)}`;
+            // Google userinfo API dan email, name, picture olish
+            const userInfoResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                headers: { Authorization: `Bearer ${tokenData.access_token}` }
+            });
+            const userInfo = await userInfoResp.json();
+
+            // Barcha ma'lumotlarni birga JSON encode qilib deep link ga yuborish
+            const payload = JSON.stringify({
+                token: tokenData.access_token,
+                email: userInfo.email || '',
+                name: userInfo.name || '',
+                picture: userInfo.picture || '',
+                id_token: tokenData.id_token || ''
+            });
+            const encodedPayload = encodeURIComponent(payload);
+            const redirectUrl = `/auth-success?token=${encodedPayload}`;
             return res.redirect(redirectUrl);
         } else {
             return res.redirect('/?error=token_failed');
@@ -108,17 +122,46 @@ window.location.href = "${authUri}";
 </html>`);
 });
 
+// Language Server token bilan shu endpoint ga keladi va user ma'lumotlarini oladi
+app.get('/user/info', async (req, res) => {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.replace('Bearer ', '').trim();
+    if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+    try {
+        const userInfoResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!userInfoResp.ok) {
+            return res.status(userInfoResp.status).json({ error: 'Failed to fetch user info' });
+        }
+        const userInfo = await userInfoResp.json();
+        return res.json({
+            email: userInfo.email || '',
+            name: userInfo.name || '',
+            picture: userInfo.picture || '',
+            id: userInfo.id || ''
+        });
+    } catch (err) {
+        console.error('[Elvion-Auth] /user/info error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 
 // AI Configuration
 const AI_PROVIDERS = {
     groq: {
         baseUrl: 'https://api.groq.com/openai/v1',
-        model: 'llama-3.3-70b-versatile',
+        model: 'gpt-oss-120b',
+        fallbackModel: 'llama-3.3-70b-versatile',
         apiKey: process.env.GROQ_API_KEY || ''
     },
     cerebras: {
         baseUrl: 'https://api.cerebras.ai/v1',
         model: 'gpt-oss-120b',
+        fallbackModel: 'llama-3.3-70b',
         apiKey: process.env.CEREBRAS_API_KEY || ''
     }
 };
@@ -126,6 +169,36 @@ const AI_PROVIDERS = {
 let activeProvider = 'groq';
 
 const SYSTEM_PROMPT = `You are Elvion AI, an advanced intelligent coding assistant integrated into the Elvion IDE. Your goal is to provide precise, accurate, and helpful answers to the developer. Provide fully functional, clean, and elegant code. Do not add unnecessary fluff, but be polite and clear.`;
+
+// Models endpoint — alohida GET route
+app.get(['/v1/models', '/api/v1/models', '/models'], (req, res) => {
+    return res.json({
+        object: 'list',
+        data: [
+            {
+                id: AI_PROVIDERS.groq.model,
+                object: 'model',
+                created: Date.now(),
+                owned_by: 'groq',
+                name: 'Elvion Fast (Groq)'
+            },
+            {
+                id: AI_PROVIDERS.cerebras.model,
+                object: 'model',
+                created: Date.now(),
+                owned_by: 'cerebras',
+                name: 'Elvion Ultra (Cerebras)'
+            },
+            {
+                id: AI_PROVIDERS.groq.fallbackModel,
+                object: 'model',
+                created: Date.now(),
+                owned_by: 'groq',
+                name: 'Llama 3.3 70B (Groq)'
+            }
+        ]
+    });
+});
 
 app.post('/switch-provider', (req, res) => {
     const provider = req.body?.provider;
@@ -139,17 +212,7 @@ app.post('/switch-provider', (req, res) => {
 
 // AI Translator (Google -> OpenAI)
 app.use(async (req, res, next) => {
-    if (req.path === '/v1/models' || req.path === '/api/v1/models' || req.path === '/models') {
-        return res.json({
-            object: 'list',
-            data: [
-                { id: AI_PROVIDERS.groq.model, object: 'model', created: Date.now(), owned_by: 'elvion', title: 'Elvion Fast (Groq)' },
-                { id: AI_PROVIDERS.cerebras.model, object: 'model', created: Date.now(), owned_by: 'elvion', title: 'Elvion Ultra (Cerebras)' }
-            ]
-        });
-    }
-
-    if (req.path === '/' || req.path === '/index.html' || req.path.startsWith('/auth') || req.method === 'GET') {
+    if (req.path === '/' || req.path === '/index.html' || req.path.startsWith('/auth') || req.path === '/user/info' || req.method === 'GET') {
         return next();
     }
 
@@ -201,14 +264,12 @@ app.use(async (req, res, next) => {
         }
 
         if (isStream) {
-            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Transfer-Encoding', 'chunked');
-            res.write('[\n');
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let aiTextBuffer = '';
-            let isFirstChunk = true;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -223,28 +284,20 @@ app.use(async (req, res, next) => {
                             const data = JSON.parse(line.slice(6));
                             if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
                                 const text = data.choices[0].delta.content;
-                                aiTextBuffer += text;
-
                                 const googleChunk = {
                                     candidates: [{
                                         content: { parts: [{ text }] },
                                         finishReason: null
                                     }]
                                 };
-
-                                if (!isFirstChunk) {
-                                    res.write(',\n');
-                                }
-                                res.write(JSON.stringify(googleChunk));
-                                isFirstChunk = false;
+                                // Google streamGenerateContent format: JSON array items as SSE
+                                res.write(`data: ${JSON.stringify(googleChunk)}\n\n`);
                             }
-                        } catch (e) {
-                            // ignore parse error
-                        }
+                        } catch (e) { /* ignore parse errors */ }
                     }
                 }
             }
-            res.write('\n]');
+            res.write('data: [DONE]\n\n');
             res.end();
         } else {
             const data = await response.json();
