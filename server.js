@@ -339,7 +339,7 @@ app.use((req, res, next) => {
         return res.json({
             done: true,
             response: {
-                cloudaicompanionProject: 'elvion-project'
+                cloudaicompanionProject: { id: 'elvion-project' }
             }
         });
     }
