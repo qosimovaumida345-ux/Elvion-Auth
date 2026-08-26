@@ -302,19 +302,17 @@ app.use((req, res, next) => {
 
         ALL_MODELS.forEach(m => {
             const mId = m.id; // Use full ID e.g. groq/gpt-oss-120b
+            // MUHIM: "model" (enum Model), "api_provider" va "model_provider" (enum'lar)
+            // maydonlarini QO'SHMAYMIZ - bular proto enum, string emas. Agar bu yerda
+            // string yozsak, protobuf-es fromJson() qattiq parse xatosi beradi va butun
+            // "models" map bo'sh qaytadi (aynan "No models available" xatosining sababi).
+            // Faqat FetchAvailableModelsResponse.ModelDetails sxemasida haqiqatan mavjud
+            // bo'lgan, string/bool/int turidagi maydonlarni qoldiramiz.
             modelsMap[mId] = {
-                model: mId,
-                displayName: m.name,
+                display_name: m.name,
                 description: m.name,
-                provider: m.owned_by,
-                capabilities: {
-                    supportsChat: true,
-                    supportsCompletion: true,
-                    supportsAgentMode: true
-                },
-                defaultOn: mId === 'groq/gpt-oss-120b',
-                hardLimit: 0,
-                softLimit: 0
+                disabled: false,
+                beta: false
             };
             if (m.owned_by === 'cerebras') cerebrasModelIds.push(mId);
             else groqModelIds.push(mId);
@@ -322,17 +320,16 @@ app.use((req, res, next) => {
 
         const famResponse = {
             models: modelsMap,
-            agentModelSorts: [
+            agent_model_sorts: [
                 {
-                    displayName: 'Elvion AI Models',
+                    display_name: 'Elvion AI Models',
                     groups: [
-                        { displayName: 'Cerebras Ultra Speed', modelIds: cerebrasModelIds },
-                        { displayName: 'Groq Fast Inference', modelIds: groqModelIds }
+                        { display_name: 'Cerebras Ultra Speed', model_ids: cerebrasModelIds },
+                        { display_name: 'Groq Fast Inference', model_ids: groqModelIds }
                     ]
                 }
             ],
-            defaultAgentModelId: 'groq/gpt-oss-120b',
-            defaultCompletionModelId: 'groq/gpt-oss-20b'
+            default_agent_model_id: 'groq/gpt-oss-120b'
         };
         // TEMP DEBUG
         console.log('[DEBUG] fetchAvailableModels javobi:', JSON.stringify(famResponse));
@@ -340,31 +337,31 @@ app.use((req, res, next) => {
     }
 
     if (p.includes('loadCodeAssist')) {
+        // Sxema (LoadCodeAssistResponse) protobuf descriptor'dan tasdiqlangan:
+        // current_tier, allowed_tiers, cloudaicompanion_project (string),
+        // gcp_managed (bool), paid_tier (to'g'ridan-to'g'ri UserTier, "tier" wrapper YO'Q).
+        // "status" va "project" degan maydonlar SXEMADA UMUMAN YO'Q edi - olib tashlandi.
         const lcaResponse = {
-            currentTier: {
+            current_tier: {
                 id: 'free-tier',
                 name: 'Elvion Pro',
                 description: 'Unlimited access to Groq & Cerebras AI Models',
-                isDefault: true
+                is_default: true
             },
-            allowedTiers: [
+            allowed_tiers: [
                 {
                     id: 'free-tier',
                     name: 'Elvion Pro',
                     description: 'Unlimited access to Groq & Cerebras AI Models',
-                    isDefault: true
+                    is_default: true
                 }
             ],
-            paidTier: {
-                tier: {
-                    id: 'free-tier',
-                    name: 'Elvion Pro'
-                },
-                availableCredits: []
+            paid_tier: {
+                id: 'free-tier',
+                name: 'Elvion Pro'
             },
-            cloudaicompanionProject: 'elvion-project',
-            project: 'elvion-project',
-            status: 1
+            cloudaicompanion_project: 'elvion-project',
+            gcp_managed: false
         };
         // TEMP DEBUG
         console.log('[DEBUG] loadCodeAssist javobi:', JSON.stringify(lcaResponse));
@@ -388,10 +385,14 @@ app.use((req, res, next) => {
     }
 
     if (p.includes('onboardUser')) {
+        // Sxema (OnboardUserResponse) tasdiqlangan: bu Long-Running-Operation
+        // wrapper (done/response) EMAS - to'g'ridan-to'g'ri javob obyekti.
+        // cloudaicompanion_project - bu Project MESSAGE (id/name/project_number),
+        // ichida yana bitta {id: ...} wrapper kerak emas.
         return res.json({
-            done: true,
-            response: {
-                cloudaicompanionProject: { id: 'elvion-project' }
+            cloudaicompanion_project: {
+                id: 'elvion-project',
+                name: 'elvion-project'
             }
         });
     }
