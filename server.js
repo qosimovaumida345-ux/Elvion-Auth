@@ -11,6 +11,16 @@ const PORT = process.env.PORT || 8080;
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+// express.json() noto'g'ri/bo'sh JSON kelganda xato tashlaydi - buni ushlab,
+// server crash bo'lib qolmasligi uchun bo'sh {} bilan davom ettiramiz.
+app.use((err, req, res, next) => {
+    if (err && err.type === 'entity.parse.failed') {
+        console.warn(`[Elvion-Auth] JSON parse failed for ${req.method} ${req.path}, continuing with empty body`);
+        req.body = {};
+        return next();
+    }
+    next(err);
+});
 app.use(express.raw({ type: ['application/grpc-web*', 'application/grpc*'], limit: '50mb' }));
 
 // Serve static frontend files
@@ -385,14 +395,55 @@ app.use((req, res, next) => {
     }
 
     if (p.includes('onboardUser')) {
-        // Sxema (OnboardUserResponse) tasdiqlangan: bu Long-Running-Operation
-        // wrapper (done/response) EMAS - to'g'ridan-to'g'ri javob obyekti.
-        // cloudaicompanion_project - bu Project MESSAGE (id/name/project_number),
-        // ichida yana bitta {id: ...} wrapper kerak emas.
+        // LS onboardUser javobidan keyin operation "name" maydonini olib,
+        // keyingi so'rovni GET /v1internal/{name} ga yuboradi (LRO polling).
+        // Agar "name" bo'lmasa, LS buni "undefined" deb yuboradi -> 404/loop.
+        // Shuning uchun operation-style javob qaytaramiz va "name"ni ham
+        // pastdagi generic GET handler orqali ushlab, done:true bilan javob beramiz.
         return res.json({
-            cloudaicompanion_project: {
-                id: 'elvion-project',
-                name: 'elvion-project'
+            name: 'operations/onboard-elvion-project',
+            done: true,
+            response: {
+                '@type': 'type.googleapis.com/google.cloud.cloudaicompanion.v1internal.OnboardUserResponse',
+                cloudaicompanion_project: {
+                    id: 'elvion-project',
+                    name: 'elvion-project'
+                }
+            }
+        });
+    }
+
+    // LRO polling: LS onboardUser javobidagi "name" (operations/...) ni
+    // GET orqali so'raydi. Har doim "done: true" bilan javob beramiz,
+    // shunda LS to'xtab qolmaydi.
+    if (p.startsWith('/v1internal/operations/') || p.includes('operations/onboard-elvion-project')) {
+        return res.json({
+            name: 'operations/onboard-elvion-project',
+            done: true,
+            response: {
+                '@type': 'type.googleapis.com/google.cloud.cloudaicompanion.v1internal.OnboardUserResponse',
+                cloudaicompanion_project: {
+                    id: 'elvion-project',
+                    name: 'elvion-project'
+                }
+            }
+        });
+    }
+
+    // Himoya: agar biror joyda LS haqiqatan ham /v1internal/undefined
+    // yoki shunga o'xshash noto'g'ri qurilgan yo'lga so'rov yuborsa,
+    // 500/crash o'rniga bo'sh-lekin-valid javob qaytaramiz, shunda
+    // login zanjiri to'xtab qolmaydi.
+    if (p === '/v1internal/undefined' || p.endsWith('/undefined')) {
+        console.warn(`[Elvion-Auth] WARNING: caught request to literal "undefined" path: ${p}`);
+        return res.json({
+            name: 'operations/onboard-elvion-project',
+            done: true,
+            response: {
+                cloudaicompanion_project: {
+                    id: 'elvion-project',
+                    name: 'elvion-project'
+                }
             }
         });
     }
