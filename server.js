@@ -245,12 +245,55 @@ app.get(['/user/info', '/api/user/info', '/oauth2/v2/userinfo'], async (req, res
     });
 });
 
+// ===================================================================
+// TEMP HAR-STYLE TRACE LAYER - tekshirishdan keyin butunlay olib tashlang
+// Har bir so'rov/javob juftligini to'liq log qiladi: method, path,
+// request body, response status, response body, va latency (ms).
+// ===================================================================
+app.use((req, res, next) => {
+    const traceId = Math.random().toString(36).slice(2, 8);
+    const startedAt = Date.now();
+
+    // MUHIM: express.json() bu blokdan oldin ro'yxatdan o'tgan (yuqorida, 13-qator),
+    // shuning uchun raw stream allaqachon iste'mol qilingan. req.body dan foydalanamiz,
+    // bu - allaqachon parse qilingan JSON obyekt (yoki parse bo'lmasa {}).
+    console.log(`[HAR][${traceId}] >>> REQUEST ${req.method} ${req.path} | content-type=${req.headers['content-type'] || '(none)'} | parsed_body=${JSON.stringify(req.body)}`);
+
+    // res.json va res.send ni o'rab olamiz, shunda haqiqatan nima yuborilganini
+    // va LS bunga qanday status bilan "muomala qilganini" (ya'ni bizning tomondan
+    // qaytarilgan status kodini) ko'ramiz. Bu LS'ning o'zi qanday qabul qilganini
+    // to'g'ridan-to'g'ri ko'rsatmaydi (bu client-side), lekin bizning chiqishimizni
+    // 100% aniq qayd etadi, keyingi chaqiruv bilan taqqoslash uchun.
+    const originalJson = res.json.bind(res);
+    res.json = (body) => {
+        const elapsed = Date.now() - startedAt;
+        console.log(`[HAR][${traceId}] <<< RESPONSE ${req.method} ${req.path} | status=${res.statusCode} | elapsed=${elapsed}ms | body=${JSON.stringify(body)}`);
+        return originalJson(body);
+    };
+
+    const originalStatus = res.status.bind(res);
+    res.status = (code) => {
+        console.log(`[HAR][${traceId}] status() explicitly set to ${code} for ${req.path}`);
+        return originalStatus(code);
+    };
+
+    // Agar javob umuman yuborilmasdan ulanish yopilib qolsa (masalan,
+    // biror joyda throw bo'lib, catch qilinmasa), buni ham ko'ramiz.
+    res.on('finish', () => {
+        if (!res.headersSent) return; // normal holat, allaqachon logladik
+    });
+    res.on('close', () => {
+        if (!res.writableEnded) {
+            console.log(`[HAR][${traceId}] !!! CONNECTION CLOSED BEFORE RESPONSE FINISHED for ${req.method} ${req.path} (elapsed=${Date.now() - startedAt}ms) - LS so'rovni bekor qilgan yoki timeout bo'lgan bo'lishi mumkin`);
+        }
+    });
+
+    next();
+});
+
 // CloudCode Onboarding, Tier Handlers, Models & Status
 app.use((req, res, next) => {
     const p = req.path;
-
-    // TEMP DEBUG - shu qatorni olib tashlang tekshirishdan keyin
-    console.log(`[DEBUG] ${req.method} ${p} | headers:`, JSON.stringify(req.headers));
 
     if (p.includes('fetchAvailableModels') || p.includes('getAvailableModels') || p === '/v1/models' || p === '/api/v1/models' || p === '/models') {
         const modelsMap = {};
