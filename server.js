@@ -249,6 +249,9 @@ app.get(['/user/info', '/api/user/info', '/oauth2/v2/userinfo'], async (req, res
 app.use((req, res, next) => {
     const p = req.path;
 
+    // TEMP DEBUG - shu qatorni olib tashlang tekshirishdan keyin
+    console.log(`[DEBUG] ${req.method} ${p} | headers:`, JSON.stringify(req.headers));
+
     if (p.includes('fetchAvailableModels') || p.includes('getAvailableModels') || p === '/v1/models' || p === '/api/v1/models' || p === '/models') {
         const modelsMap = {};
         const groqModelIds = [];
@@ -274,7 +277,7 @@ app.use((req, res, next) => {
             else groqModelIds.push(mId);
         });
 
-        return res.json({
+        const famResponse = {
             models: modelsMap,
             agentModelSorts: [
                 {
@@ -287,11 +290,14 @@ app.use((req, res, next) => {
             ],
             defaultAgentModelId: 'groq/gpt-oss-120b',
             defaultCompletionModelId: 'groq/gpt-oss-20b'
-        });
+        };
+        // TEMP DEBUG
+        console.log('[DEBUG] fetchAvailableModels javobi:', JSON.stringify(famResponse));
+        return res.json(famResponse);
     }
 
     if (p.includes('loadCodeAssist')) {
-        return res.json({
+        const lcaResponse = {
             currentTier: {
                 id: 'free-tier',
                 name: 'Elvion Pro',
@@ -316,7 +322,10 @@ app.use((req, res, next) => {
             cloudaicompanionProject: 'elvion-project',
             project: 'elvion-project',
             status: 1
-        });
+        };
+        // TEMP DEBUG
+        console.log('[DEBUG] loadCodeAssist javobi:', JSON.stringify(lcaResponse));
+        return res.json(lcaResponse);
     }
 
     if (p.includes('fetchUserInfo') || p.includes('getUserAccountSettings')) {
@@ -581,7 +590,7 @@ app.use(async (req, res, next) => {
                                 };
                                 res.write(`data: ${JSON.stringify(googleChunk)}\n\n`);
                             }
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                 }
             }
