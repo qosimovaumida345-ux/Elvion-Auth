@@ -520,6 +520,49 @@ app.use((req, res, next) => {
         p.endsWith('/GetProfileData') ||
         p.endsWith('/RetrieveUserQuotaSummary')
     ) {
+        // MUHIM: frontend bundle tahlili shuni tasdiqladi -
+        // isModelListLoading = (userStatus.cascadeModelConfigData === undefined).
+        // Shuning uchun bu maydon shart, aks holda IDE abadiy
+        // "Loading models..." holatida qoladi va hech qachon modellarni
+        // ko'rsatmaydi (na "No models available", na haqiqiy ro'yxat).
+        //
+        // clientModelConfigs[].modelOrAlias.choice.case MAJBURIY ravishda
+        // "model" (Model enum) yoki "alias" (ModelAlias enum) bo'lishi kerak -
+        // ikkalasi ham Google tomonidan qattiq kodlangan cheklangan enum,
+        // bizning erkin string ID'larimiz (masalan "cerebras/gpt-oss-120b")
+        // bu enum'larga sig'maydi. Shuning uchun har bir modelni
+        // {case:"alias", value:0} (ModelAlias.UNSPECIFIED) ga "bog'laymiz" -
+        // bu shart bajarilishi uchun kerak xolos. Haqiqiy identifikator va
+        // guruhlash kaliti - bu "label" maydoni, u erkin string.
+        const modelConfigs = ALL_MODELS.map(m => ({
+            label: m.id,
+            modelOrAlias: { choice: { case: 'alias', value: 0 } },
+            disabled: false,
+            supportedMimeTypes: {},
+            quotaInfo: {},
+            tagTitle: '',
+            tagDescription: m.name,
+            supportsThoughtCirculation: false,
+            modelUrl: ''
+        }));
+
+        const groqLabels = ALL_MODELS.filter(m => m.owned_by !== 'cerebras').map(m => m.id);
+        const cerebrasLabels = ALL_MODELS.filter(m => m.owned_by === 'cerebras').map(m => m.id);
+
+        const cascadeModelConfigData = {
+            clientModelConfigs: modelConfigs,
+            clientModelSorts: [
+                {
+                    name: 'Elvion AI Models',
+                    groups: [
+                        { groupName: 'Cerebras Ultra Speed', modelLabels: cerebrasLabels },
+                        { groupName: 'Groq Fast Inference', modelLabels: groqLabels }
+                    ]
+                }
+            ],
+            defaultOverrideModelConfig: undefined
+        };
+
         return res.json({
             signedIn: true,
             userTier: {
@@ -527,6 +570,7 @@ app.use((req, res, next) => {
                 description: 'Unlimited access to Groq & Cerebras Fast AI Models',
                 upgradeButtonText: 'Elvion Pro'
             },
+            cascadeModelConfigData,
             groups: [
                 {
                     displayName: 'Groq Models',
