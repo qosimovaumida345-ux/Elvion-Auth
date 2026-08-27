@@ -234,35 +234,6 @@ app.get('/auth/google/callback', async (req, res) => {
     }
 });
 
-        const tokenData = await tokenResponse.json();
-
-        if (tokenData.access_token) {
-            const userInfoResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-                headers: { Authorization: `Bearer ${tokenData.access_token}` }
-            });
-            const userInfo = await userInfoResp.json();
-
-            const payload = JSON.stringify({
-                token: tokenData.access_token,
-                refresh_token: tokenData.refresh_token || '',
-                email: userInfo.email || '',
-                name: userInfo.name || '',
-                picture: userInfo.picture || '',
-                id_token: tokenData.id_token || ''
-            });
-            const encodedPayload = encodeURIComponent(payload);
-            const redirectUrl = `/auth-success?token=${encodedPayload}`;
-            return res.redirect(redirectUrl);
-        } else {
-            console.error('OAuth Token exchange failed:', tokenData);
-            return res.redirect('/?error=token_failed');
-        }
-    } catch (err) {
-        console.error('Google Auth Error:', err);
-        return res.redirect('/?error=server_error');
-    }
-});
-
 app.get('/auth-success', (req, res) => {
     const token = req.query.token || '';
     const authUri = `elvion-ide://auth-success?token=${encodeURIComponent(token)}`;
