@@ -320,9 +320,8 @@ app.use((req, res, next) => {
         ALL_MODELS.forEach(m => {
             const mId = m.id;
             modelsMap[mId] = {
-                model: m.enum_str, // Use the string representation of the enum
+                model: 'MODEL_GOOGLE_GEMINI_2_5_FLASH', 
                 displayName: m.name,
-                display_name: m.name,
                 description: m.name,
                 disabled: false,
                 beta: false
@@ -336,25 +335,13 @@ app.use((req, res, next) => {
             agentModelSorts: [
                 {
                     displayName: 'Elvion AI Models',
-                    display_name: 'Elvion AI Models',
                     groups: [
-                        { displayName: 'Cerebras Ultra Speed', display_name: 'Cerebras Ultra Speed', modelIds: cerebrasModelIds, model_ids: cerebrasModelIds },
-                        { displayName: 'Groq Fast Inference', display_name: 'Groq Fast Inference', modelIds: groqModelIds, model_ids: groqModelIds }
+                        { displayName: 'Cerebras Ultra Speed', modelIds: cerebrasModelIds },
+                        { displayName: 'Groq Fast Inference', modelIds: groqModelIds }
                     ]
                 }
             ],
-            agent_model_sorts: [
-                {
-                    displayName: 'Elvion AI Models',
-                    display_name: 'Elvion AI Models',
-                    groups: [
-                        { displayName: 'Cerebras Ultra Speed', display_name: 'Cerebras Ultra Speed', modelIds: cerebrasModelIds, model_ids: cerebrasModelIds },
-                        { displayName: 'Groq Fast Inference', display_name: 'Groq Fast Inference', modelIds: groqModelIds, model_ids: groqModelIds }
-                    ]
-                }
-            ],
-            defaultAgentModelId: 'groq/gpt-oss-120b',
-            default_agent_model_id: 'groq/gpt-oss-120b'
+            defaultAgentModelId: 'groq/gpt-oss-120b'
         };
         console.log('[DEBUG] fetchAvailableModels javobi:', JSON.stringify(famResponse));
         return res.json(famResponse);
