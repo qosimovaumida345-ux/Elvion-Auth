@@ -68,56 +68,64 @@ const ALL_MODELS = [
         object: 'model',
         owned_by: 'cerebras',
         name: 'Elvion Ultra 120B (Cerebras ~3000 t/s)',
-        enum_str: 'MODEL_GOOGLE_GEMINI_INTERNAL_BYOM'
+        enum_str: 'MODEL_GOOGLE_GEMINI_INTERNAL_BYOM',
+        enum_val: 326
     },
     {
         id: 'cerebras/gemma-4-31b',
         object: 'model',
         owned_by: 'cerebras',
         name: 'Elvion Gemma 31B (Cerebras)',
-        enum_str: 'MODEL_GOOGLE_GEMINI_HORIZONDAWN'
+        enum_str: 'MODEL_GOOGLE_GEMINI_HORIZONDAWN',
+        enum_val: 336
     },
     {
         id: 'groq/gpt-oss-120b',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Fast 120B (Groq)',
-        enum_str: 'MODEL_GOOGLE_GEMINI_PUREPRISM'
+        enum_str: 'MODEL_GOOGLE_GEMINI_PUREPRISM',
+        enum_val: 337
     },
     {
         id: 'groq/gpt-oss-20b',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Compact 20B (Groq)',
-        enum_str: 'MODEL_GOOGLE_GEMINI_GENTLEISLAND'
+        enum_str: 'MODEL_GOOGLE_GEMINI_GENTLEISLAND',
+        enum_val: 338
     },
     {
         id: 'groq/qwen3.6-27b',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Qwen 3.6 27B (Groq)',
-        enum_str: 'MODEL_GOOGLE_GEMINI_ORIONFIRE'
+        enum_str: 'MODEL_GOOGLE_GEMINI_ORIONFIRE',
+        enum_val: 343
     },
     {
         id: 'groq/compound',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Compound System (Groq)',
-        enum_str: 'MODEL_GOOGLE_GEMINI_COSMICFORGE'
+        enum_str: 'MODEL_GOOGLE_GEMINI_COSMICFORGE',
+        enum_val: 347
     },
     {
         id: 'groq/llama-3.3-70b-versatile',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Llama 3.3 70B (Groq)',
-        enum_str: 'MODEL_GOOGLE_GEMINI_RIFTRUNNER'
+        enum_str: 'MODEL_GOOGLE_GEMINI_RIFTRUNNER',
+        enum_val: 348
     },
     {
         id: 'gpt-oss-120b',
         object: 'model',
         owned_by: 'elvion',
         name: 'GPT-OSS 120B (Default)',
-        enum_str: 'MODEL_GOOGLE_GEMINI_INFINITYJET'
+        enum_str: 'MODEL_GOOGLE_GEMINI_INFINITYJET',
+        enum_val: 350
     }
 ];
 
@@ -320,7 +328,7 @@ app.use((req, res, next) => {
         ALL_MODELS.forEach(m => {
             const mId = m.id;
             modelsMap[mId] = {
-                model: 'MODEL_GOOGLE_GEMINI_3_5_FLASH',
+                model: m.enum_val,
                 displayName: m.name,
                 description: m.name,
                 disabled: false,
