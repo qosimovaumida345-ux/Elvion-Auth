@@ -62,55 +62,62 @@ let activeProvider = process.env.DEFAULT_PROVIDER || 'groq';
 
 const SYSTEM_PROMPT = `You are Elvion AI, a world-class coding assistant inside Elvion IDE. Provide high quality, concise, and clean code. Answer directly and cleanly.`;
 
-// List of all custom models
 const ALL_MODELS = [
     {
         id: 'cerebras/gpt-oss-120b',
         object: 'model',
         owned_by: 'cerebras',
-        name: 'Elvion Ultra 120B (Cerebras ~3000 t/s)'
+        name: 'Elvion Ultra 120B (Cerebras ~3000 t/s)',
+        enum_val: 326 // GOOGLE_GEMINI_INTERNAL_BYOM
     },
     {
         id: 'cerebras/gemma-4-31b',
         object: 'model',
         owned_by: 'cerebras',
-        name: 'Elvion Gemma 31B (Cerebras)'
+        name: 'Elvion Gemma 31B (Cerebras)',
+        enum_val: 336 // HORIZONDAWN
     },
     {
         id: 'groq/gpt-oss-120b',
         object: 'model',
         owned_by: 'groq',
-        name: 'Elvion Fast 120B (Groq)'
+        name: 'Elvion Fast 120B (Groq)',
+        enum_val: 337 // PUREPRISM
     },
     {
         id: 'groq/gpt-oss-20b',
         object: 'model',
         owned_by: 'groq',
-        name: 'Elvion Compact 20B (Groq)'
+        name: 'Elvion Compact 20B (Groq)',
+        enum_val: 338 // GENTLEISLAND
     },
     {
         id: 'groq/qwen3.6-27b',
         object: 'model',
         owned_by: 'groq',
-        name: 'Elvion Qwen 3.6 27B (Groq)'
+        name: 'Elvion Qwen 3.6 27B (Groq)',
+        enum_val: 343 // ORIONFIRE
     },
     {
         id: 'groq/compound',
         object: 'model',
         owned_by: 'groq',
-        name: 'Elvion Compound System (Groq)'
+        name: 'Elvion Compound System (Groq)',
+        enum_val: 347 // COSMICFORGE
     },
     {
         id: 'groq/llama-3.3-70b-versatile',
         object: 'model',
         owned_by: 'groq',
-        name: 'Elvion Llama 3.3 70B (Groq)'
+        name: 'Elvion Llama 3.3 70B (Groq)',
+        enum_val: 348 // RIFTRUNNER
     },
     {
         id: 'gpt-oss-120b',
         object: 'model',
         owned_by: 'elvion',
-        name: 'GPT-OSS 120B (Default)'
+        name: 'GPT-OSS 120B (Default)',
+        enum_val: 350 // INFINITYJET
     }
 ];
 
@@ -306,34 +313,36 @@ app.use((req, res, next) => {
     const p = req.path;
 
     if (p.includes('fetchAvailableModels') || p.includes('getAvailableModels') || p === '/v1/models' || p === '/api/v1/models' || p === '/models') {
-        // MUHIM: rasmiy PicoClaw hujjati (docs.picoclaw.io/docs/providers/antigravity)
-        // FetchAvailableModelsResponse ning HAQIQIY, real ishlaydigan
-        // implementatsiyadan olingan sxemasini beradi:
-        //
-        //   type FetchAvailableModelsResponse = {
-        //     models?: Record<string, {
-        //       displayName?: string;
-        //       quotaInfo?: { remainingFraction?, resetTime?, isExhausted? };
-        //     }>;
-        //   };
-        //
-        // "agentModelSorts", "defaultAgentModelId", "description", "disabled",
-        // "beta" - bularning hech biri bu rasmiy sxemada YO'Q. Ular oldingi
-        // urinishda taxmin sifatida qo'shilgan edi va tasdiqlanmagan edi.
-        // Minimal, tasdiqlangan sxemaga qaytamiz.
         const modelsMap = {};
+        const groqModelIds = [];
+        const cerebrasModelIds = [];
+
         ALL_MODELS.forEach(m => {
-            modelsMap[m.id] = {
+            const mId = m.id;
+            modelsMap[mId] = {
+                model: m.enum_val, // Integer enum representation
                 displayName: m.name,
-                quotaInfo: {
-                    remainingFraction: 1,
-                    isExhausted: false
-                }
+                description: m.name,
+                disabled: false,
+                beta: false
             };
+            if (m.owned_by === 'cerebras') cerebrasModelIds.push(mId);
+            else groqModelIds.push(mId);
         });
 
-        const famResponse = { models: modelsMap };
-        // TEMP DEBUG
+        const famResponse = {
+            models: modelsMap,
+            agentModelSorts: [
+                {
+                    displayName: 'Elvion AI Models',
+                    groups: [
+                        { displayName: 'Cerebras Ultra Speed', modelIds: cerebrasModelIds },
+                        { displayName: 'Groq Fast Inference', modelIds: groqModelIds }
+                    ]
+                }
+            ],
+            defaultAgentModelId: 'groq/gpt-oss-120b'
+        };
         console.log('[DEBUG] fetchAvailableModels javobi:', JSON.stringify(famResponse));
         return res.json(famResponse);
     }
@@ -512,49 +521,6 @@ app.use((req, res, next) => {
         p.endsWith('/GetProfileData') ||
         p.endsWith('/RetrieveUserQuotaSummary')
     ) {
-        // MUHIM: frontend bundle tahlili shuni tasdiqladi -
-        // isModelListLoading = (userStatus.cascadeModelConfigData === undefined).
-        // Shuning uchun bu maydon shart, aks holda IDE abadiy
-        // "Loading models..." holatida qoladi va hech qachon modellarni
-        // ko'rsatmaydi (na "No models available", na haqiqiy ro'yxat).
-        //
-        // clientModelConfigs[].modelOrAlias.choice.case MAJBURIY ravishda
-        // "model" (Model enum) yoki "alias" (ModelAlias enum) bo'lishi kerak -
-        // ikkalasi ham Google tomonidan qattiq kodlangan cheklangan enum,
-        // bizning erkin string ID'larimiz (masalan "cerebras/gpt-oss-120b")
-        // bu enum'larga sig'maydi. Shuning uchun har bir modelni
-        // {case:"alias", value:0} (ModelAlias.UNSPECIFIED) ga "bog'laymiz" -
-        // bu shart bajarilishi uchun kerak xolos. Haqiqiy identifikator va
-        // guruhlash kaliti - bu "label" maydoni, u erkin string.
-        const modelConfigs = ALL_MODELS.map(m => ({
-            label: m.id,
-            modelOrAlias: { choice: { case: 'alias', value: 0 } },
-            disabled: false,
-            supportedMimeTypes: {},
-            quotaInfo: {},
-            tagTitle: '',
-            tagDescription: m.name,
-            supportsThoughtCirculation: false,
-            modelUrl: ''
-        }));
-
-        const groqLabels = ALL_MODELS.filter(m => m.owned_by !== 'cerebras').map(m => m.id);
-        const cerebrasLabels = ALL_MODELS.filter(m => m.owned_by === 'cerebras').map(m => m.id);
-
-        const cascadeModelConfigData = {
-            clientModelConfigs: modelConfigs,
-            clientModelSorts: [
-                {
-                    name: 'Elvion AI Models',
-                    groups: [
-                        { groupName: 'Cerebras Ultra Speed', modelLabels: cerebrasLabels },
-                        { groupName: 'Groq Fast Inference', modelLabels: groqLabels }
-                    ]
-                }
-            ],
-            defaultOverrideModelConfig: undefined
-        };
-
         return res.json({
             signedIn: true,
             userTier: {
@@ -562,7 +528,6 @@ app.use((req, res, next) => {
                 description: 'Unlimited access to Groq & Cerebras Fast AI Models',
                 upgradeButtonText: 'Elvion Pro'
             },
-            cascadeModelConfigData,
             groups: [
                 {
                     displayName: 'Groq Models',
@@ -585,39 +550,30 @@ app.use((req, res, next) => {
 function resolveProviderAndModel(requestedModel) {
     const m = (requestedModel || '').toLowerCase();
 
-    if (m.includes('cerebras') || m.includes('gemma')) {
-        return {
-            provider: AI_PROVIDERS.cerebras,
-            model: m.includes('gemma') ? 'gemma-4-31b' : 'gpt-oss-120b'
-        };
+    // Map the assigned enums to our custom models
+    if (m === '326' || m.includes('byom') || (m.includes('cerebras') && !m.includes('gemma'))) {
+        return { provider: AI_PROVIDERS.cerebras, model: 'gpt-oss-120b' };
     }
-
-    if (m.includes('20b')) {
-        return {
-            provider: AI_PROVIDERS.groq,
-            model: 'openai/gpt-oss-20b'
-        };
+    if (m === '336' || m.includes('horizondawn') || m.includes('gemma')) {
+        return { provider: AI_PROVIDERS.cerebras, model: 'gemma-4-31b' };
     }
-
-    if (m.includes('qwen')) {
-        return {
-            provider: AI_PROVIDERS.groq,
-            model: 'qwen/qwen3.6-27b'
-        };
+    if (m === '337' || m.includes('pureprism') || (m.includes('120b') && m.includes('groq'))) {
+        return { provider: AI_PROVIDERS.groq, model: 'openai/gpt-oss-120b' };
     }
-
-    if (m.includes('compound')) {
-        return {
-            provider: AI_PROVIDERS.groq,
-            model: 'groq/compound'
-        };
+    if (m === '338' || m.includes('gentleisland') || m.includes('20b')) {
+        return { provider: AI_PROVIDERS.groq, model: 'openai/gpt-oss-20b' };
     }
-
-    if (m.includes('llama') || m.includes('70b')) {
-        return {
-            provider: AI_PROVIDERS.groq,
-            model: 'llama-3.3-70b-versatile'
-        };
+    if (m === '343' || m.includes('orionfire') || m.includes('qwen')) {
+        return { provider: AI_PROVIDERS.groq, model: 'qwen/qwen3.6-27b' };
+    }
+    if (m === '347' || m.includes('cosmicforge') || m.includes('compound')) {
+        return { provider: AI_PROVIDERS.groq, model: 'groq/compound' };
+    }
+    if (m === '348' || m.includes('riftrunner') || m.includes('70b') || m.includes('llama')) {
+        return { provider: AI_PROVIDERS.groq, model: 'llama-3.3-70b-versatile' };
+    }
+    if (m === '350' || m.includes('infinityjet')) {
+        return { provider: AI_PROVIDERS.groq, model: 'openai/gpt-oss-120b' };
     }
 
     if (activeProvider === 'cerebras') {
