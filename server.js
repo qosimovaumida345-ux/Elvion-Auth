@@ -310,16 +310,30 @@ app.use((req, res, next) => {
         const groqModelIds = [];
         const cerebrasModelIds = [];
 
+        // MUHIM (Electron main process bundle - out/main.js - dan tasdiqlangan):
+        // r2l()/e2l()/t2l() funksiyalari bu javobni CAMELCASE deb kutadi,
+        // snake_case EMAS! r2l() ichida "e.agentModelSorts" (e.agent_model_sorts
+        // emas), "l.modelIds" (model_ids emas), "e.defaultAgentModelId" ishlatiladi.
+        // Bular oddiy JS obyekt maydonlari - agar snake_case yozilsa,
+        // "e.agentModelSorts" undefined bo'ladi va "for...of undefined" xato
+        // tashlaydi, refreshUserStatus() yiqiladi va cascadeModelConfigData
+        // hech qachon to'ldirilmaydi (aynan "No models available" muammosi,
+        // hech qanday tarmoq xatosisiz, chunki bu main-process ichida sodir
+        // bo'ladi, brauzer Network tabida ko'rinmaydi).
+        //
+        // Har bir model uchun "displayName" - bu ModelConfig.label maydoniga
+        // to'g'ridan-to'g'ri ko'chiriladi (e2l: label:t.displayName) va
+        // ModelGroup.modelLabels ham aynan shu displayName qiymatlarini
+        // ishlatadi (t2l: modelLabels:...map(n=>e[n].displayName)) - shuning
+        // uchun displayName har bir model uchun NOYOB bo'lishi shart, aks
+        // holda guruhlash noto'g'ri ishlaydi.
         ALL_MODELS.forEach(m => {
             const mId = m.id; // Use full ID e.g. groq/gpt-oss-120b
-            // MUHIM: "model" (enum Model), "api_provider" va "model_provider" (enum'lar)
-            // maydonlarini QO'SHMAYMIZ - bular proto enum, string emas. Agar bu yerda
-            // string yozsak, protobuf-es fromJson() qattiq parse xatosi beradi va butun
-            // "models" map bo'sh qaytadi (aynan "No models available" xatosining sababi).
-            // Faqat FetchAvailableModelsResponse.ModelDetails sxemasida haqiqatan mavjud
-            // bo'lgan, string/bool/int turidagi maydonlarni qoldiramiz.
+            // "model" (enum Model), "apiProvider"/"modelProvider" (enum'lar)
+            // maydonlarini QO'SHMAYMIZ - ular qattiq Google enum, bizning
+            // ixtiyoriy provider string'larimiz bunga sig'maydi.
             modelsMap[mId] = {
-                display_name: m.name,
+                displayName: m.name,
                 description: m.name,
                 disabled: false,
                 beta: false
@@ -330,16 +344,16 @@ app.use((req, res, next) => {
 
         const famResponse = {
             models: modelsMap,
-            agent_model_sorts: [
+            agentModelSorts: [
                 {
-                    display_name: 'Elvion AI Models',
+                    displayName: 'Elvion AI Models',
                     groups: [
-                        { display_name: 'Cerebras Ultra Speed', model_ids: cerebrasModelIds },
-                        { display_name: 'Groq Fast Inference', model_ids: groqModelIds }
+                        { displayName: 'Cerebras Ultra Speed', modelIds: cerebrasModelIds },
+                        { displayName: 'Groq Fast Inference', modelIds: groqModelIds }
                     ]
                 }
             ],
-            default_agent_model_id: 'groq/gpt-oss-120b'
+            defaultAgentModelId: 'groq/gpt-oss-120b'
         };
         // TEMP DEBUG
         console.log('[DEBUG] fetchAvailableModels javobi:', JSON.stringify(famResponse));
