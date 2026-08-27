@@ -242,43 +242,46 @@ app.get('/auth-success', (req, res) => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Auth Success — Elvion IDE</title>
-<link rel="icon" href="/logo.png" type="image/png">
+<title>Auth Success - Elvion IDE</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#080b14;--surface:rgba(15,20,35,0.85);--border:rgba(100,130,255,0.1);--accent:#7c5bf5;--accent2:#9d4edd;--text:#e8ecf4;--text2:#8893a7;--success:#22c55e;}
+:root{--bg:#06050b;--surface:rgba(18,12,32,0.85);--border:rgba(181,56,255,0.4);--accent:#b538ff;--accent2:#ff2a85;--text:#e8ecf4;--success:#22c55e;}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center}
-.card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px 40px;text-align:center;backdrop-filter:blur(40px);box-shadow:0 0 80px rgba(124,91,245,0.15),0 32px 64px rgba(0,0,0,0.5)}
+.card{width:100%;max-width:500px;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px 40px;text-align:center;backdrop-filter:blur(40px);box-shadow:0 0 60px rgba(181,56,255,0.2),inset 0 0 20px rgba(255,42,133,0.1)}
 .icon-wrap{width:72px;height:72px;margin:0 auto 24px;border-radius:50%;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center}
 .icon-wrap svg{width:36px;height:36px;stroke:var(--success);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-h1{font-size:24px;font-weight:700;margin-bottom:8px;}
-p{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.6}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 24px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 8px 32px rgba(124,91,245,0.3);transition:transform .2s}
-.btn:hover{transform:translateY(-2px)}
-.hint{font-size:12px;color:var(--text2);margin-top:20px}
+h1{font-size:24px;font-weight:700;margin-bottom:12px;background:linear-gradient(135deg,#ffffff,#b538ff,#ff2a85);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+p{font-size:15px;line-height:1.6;color:#a3a8b8;margin-bottom:32px}
+.token-box{background:#000;border:1px solid var(--accent);padding:15px;border-radius:12px;word-break:break-all;color:#ff2a85;margin-bottom:20px;font-family:monospace;font-size:12px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:48px;padding:0 32px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:600;font-size:15px;border-radius:12px;text-decoration:none;transition:all .3s ease;border:1px solid rgba(255,255,255,0.2);box-shadow:0 0 20px rgba(255,42,133,0.4);cursor:pointer;}
+.btn:hover{transform:translateY(-2px);box-shadow:0 0 35px rgba(255,42,133,0.7);}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="icon-wrap">
-    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
   </div>
-  <h1>Authentication Successful</h1>
-  <p>Your Google account has been connected to Elvion IDE.<br>Opening Elvion IDE now...</p>
-  <a href="${authUri}" class="btn" id="openBtn">
-    <span>Open Elvion IDE</span>
-  </a>
-  <div class="hint">If the app doesn't open automatically, click the button above.</div>
+  <h1>Muvaffaqiyatli ulandi!</h1>
+  <p>Tizimga muvaffaqiyatli kirdingiz. Quyidagi tokenni nusxalab oling va Elvion IDE ichida <b>"Provide Auth Token"</b> oynasiga joylang.</p>
+  <div class="token-box" id="tokenField">${token}</div>
+  <button class="btn" onclick="copyToken()">Tokenni Nusxalash</button>
 </div>
 <script>
-window.location.href = "${authUri}";
+  function copyToken() {
+    const text = document.getElementById('tokenField').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Token muvaffaqiyatli nusxalandi! Endi Elvion IDE ga qaytib uni joylang.");
+    });
+  }
+  setTimeout(() => {
+    window.location.href = "${authUri}";
+  }, 2000);
 </script>
 </body>
 </html>`);
 });
-
-// User Info & Session endpoints
 app.get(['/user/info', '/api/user/info', '/oauth2/v2/userinfo'], async (req, res) => {
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.replace('Bearer ', '').trim();
