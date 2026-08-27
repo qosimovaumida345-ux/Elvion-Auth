@@ -68,56 +68,56 @@ const ALL_MODELS = [
         object: 'model',
         owned_by: 'cerebras',
         name: 'Elvion Ultra 120B (Cerebras ~3000 t/s)',
-        enum_str: 'GOOGLE_GEMINI_INTERNAL_BYOM'
+        enum_str: 'MODEL_GOOGLE_GEMINI_INTERNAL_BYOM'
     },
     {
         id: 'cerebras/gemma-4-31b',
         object: 'model',
         owned_by: 'cerebras',
         name: 'Elvion Gemma 31B (Cerebras)',
-        enum_str: 'GOOGLE_GEMINI_HORIZONDAWN'
+        enum_str: 'MODEL_GOOGLE_GEMINI_HORIZONDAWN'
     },
     {
         id: 'groq/gpt-oss-120b',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Fast 120B (Groq)',
-        enum_str: 'GOOGLE_GEMINI_PUREPRISM'
+        enum_str: 'MODEL_GOOGLE_GEMINI_PUREPRISM'
     },
     {
         id: 'groq/gpt-oss-20b',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Compact 20B (Groq)',
-        enum_str: 'GOOGLE_GEMINI_GENTLEISLAND'
+        enum_str: 'MODEL_GOOGLE_GEMINI_GENTLEISLAND'
     },
     {
         id: 'groq/qwen3.6-27b',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Qwen 3.6 27B (Groq)',
-        enum_str: 'GOOGLE_GEMINI_ORIONFIRE'
+        enum_str: 'MODEL_GOOGLE_GEMINI_ORIONFIRE'
     },
     {
         id: 'groq/compound',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Compound System (Groq)',
-        enum_str: 'GOOGLE_GEMINI_COSMICFORGE'
+        enum_str: 'MODEL_GOOGLE_GEMINI_COSMICFORGE'
     },
     {
         id: 'groq/llama-3.3-70b-versatile',
         object: 'model',
         owned_by: 'groq',
         name: 'Elvion Llama 3.3 70B (Groq)',
-        enum_str: 'GOOGLE_GEMINI_RIFTRUNNER'
+        enum_str: 'MODEL_GOOGLE_GEMINI_RIFTRUNNER'
     },
     {
         id: 'gpt-oss-120b',
         object: 'model',
         owned_by: 'elvion',
         name: 'GPT-OSS 120B (Default)',
-        enum_str: 'GOOGLE_GEMINI_INFINITYJET'
+        enum_str: 'MODEL_GOOGLE_GEMINI_INFINITYJET'
     }
 ];
 
