@@ -306,55 +306,33 @@ app.use((req, res, next) => {
     const p = req.path;
 
     if (p.includes('fetchAvailableModels') || p.includes('getAvailableModels') || p === '/v1/models' || p === '/api/v1/models' || p === '/models') {
-        const modelsMap = {};
-        const groqModelIds = [];
-        const cerebrasModelIds = [];
-
-        // MUHIM (Electron main process bundle - out/main.js - dan tasdiqlangan):
-        // r2l()/e2l()/t2l() funksiyalari bu javobni CAMELCASE deb kutadi,
-        // snake_case EMAS! r2l() ichida "e.agentModelSorts" (e.agent_model_sorts
-        // emas), "l.modelIds" (model_ids emas), "e.defaultAgentModelId" ishlatiladi.
-        // Bular oddiy JS obyekt maydonlari - agar snake_case yozilsa,
-        // "e.agentModelSorts" undefined bo'ladi va "for...of undefined" xato
-        // tashlaydi, refreshUserStatus() yiqiladi va cascadeModelConfigData
-        // hech qachon to'ldirilmaydi (aynan "No models available" muammosi,
-        // hech qanday tarmoq xatosisiz, chunki bu main-process ichida sodir
-        // bo'ladi, brauzer Network tabida ko'rinmaydi).
+        // MUHIM: rasmiy PicoClaw hujjati (docs.picoclaw.io/docs/providers/antigravity)
+        // FetchAvailableModelsResponse ning HAQIQIY, real ishlaydigan
+        // implementatsiyadan olingan sxemasini beradi:
         //
-        // Har bir model uchun "displayName" - bu ModelConfig.label maydoniga
-        // to'g'ridan-to'g'ri ko'chiriladi (e2l: label:t.displayName) va
-        // ModelGroup.modelLabels ham aynan shu displayName qiymatlarini
-        // ishlatadi (t2l: modelLabels:...map(n=>e[n].displayName)) - shuning
-        // uchun displayName har bir model uchun NOYOB bo'lishi shart, aks
-        // holda guruhlash noto'g'ri ishlaydi.
+        //   type FetchAvailableModelsResponse = {
+        //     models?: Record<string, {
+        //       displayName?: string;
+        //       quotaInfo?: { remainingFraction?, resetTime?, isExhausted? };
+        //     }>;
+        //   };
+        //
+        // "agentModelSorts", "defaultAgentModelId", "description", "disabled",
+        // "beta" - bularning hech biri bu rasmiy sxemada YO'Q. Ular oldingi
+        // urinishda taxmin sifatida qo'shilgan edi va tasdiqlanmagan edi.
+        // Minimal, tasdiqlangan sxemaga qaytamiz.
+        const modelsMap = {};
         ALL_MODELS.forEach(m => {
-            const mId = m.id; // Use full ID e.g. groq/gpt-oss-120b
-            // "model" (enum Model), "apiProvider"/"modelProvider" (enum'lar)
-            // maydonlarini QO'SHMAYMIZ - ular qattiq Google enum, bizning
-            // ixtiyoriy provider string'larimiz bunga sig'maydi.
-            modelsMap[mId] = {
+            modelsMap[m.id] = {
                 displayName: m.name,
-                description: m.name,
-                disabled: false,
-                beta: false
+                quotaInfo: {
+                    remainingFraction: 1,
+                    isExhausted: false
+                }
             };
-            if (m.owned_by === 'cerebras') cerebrasModelIds.push(mId);
-            else groqModelIds.push(mId);
         });
 
-        const famResponse = {
-            models: modelsMap,
-            agentModelSorts: [
-                {
-                    displayName: 'Elvion AI Models',
-                    groups: [
-                        { displayName: 'Cerebras Ultra Speed', modelIds: cerebrasModelIds },
-                        { displayName: 'Groq Fast Inference', modelIds: groqModelIds }
-                    ]
-                }
-            ],
-            defaultAgentModelId: 'groq/gpt-oss-120b'
-        };
+        const famResponse = { models: modelsMap };
         // TEMP DEBUG
         console.log('[DEBUG] fetchAvailableModels javobi:', JSON.stringify(famResponse));
         return res.json(famResponse);
