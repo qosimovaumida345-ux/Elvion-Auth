@@ -614,7 +614,7 @@ app.use(async (req, res, next) => {
         const isStream = req.path.includes('stream') || req.headers['accept']?.includes('text/event-stream');
         const body = req.body || {};
 
-        const requestedModel = (req.path.match(/models\/([^:]+)/)?.[1] || body.model || '').toLowerCase();
+        const requestedModel = (req.path.match(/models\/([^:]+)/)?.[1] || body.model || body.requested_model_id || body.requestedModelId || '').toLowerCase();
         const { provider, model: actualModel } = resolveProviderAndModel(requestedModel);
 
         if (!provider.apiKey) {
