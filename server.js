@@ -320,7 +320,7 @@ app.use((req, res, next) => {
         ALL_MODELS.forEach(m => {
             const mId = m.id;
             modelsMap[mId] = {
-                model: 'MODEL_GOOGLE_GEMINI_2_5_FLASH', 
+                model: 'MODEL_GOOGLE_GEMINI_3_5_FLASH',
                 displayName: m.name,
                 description: m.name,
                 disabled: false,
@@ -384,7 +384,7 @@ app.use((req, res, next) => {
             userSettings: {
                 tier: 'free-tier'
             },
-            email: 'user@elvion.dev',
+            email: 'abdullohmiramatov@gmail.com',
             name: 'Elvion Developer'
         });
     }
