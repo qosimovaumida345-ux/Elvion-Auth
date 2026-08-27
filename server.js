@@ -9,6 +9,42 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+import pkg from 'pg';
+const { Pool } = pkg;
+
+// PostgreSQL Connection
+const dbUrl = process.env.DATABASE_URL || 'postgresql://elvion_user:Aqc2iSa9XH9asKrfiRpsUlVcUA9LFzmr@dpg-da863tid0e5s739pgim0-a.frankfurt-postgres.render.com/elvion_db';
+const pool = new Pool({
+    connectionString: dbUrl,
+    ssl: { rejectUnauthorized: false }
+});
+
+// Initialize DB Schema
+async function initDb() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                picture TEXT,
+                tier VARCHAR(50) DEFAULT 'free-tier',
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                email VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log('[Elvion-Auth] DB Schema Initialized');
+    } catch (e) {
+        console.error('[Elvion-Auth] DB Init Error:', e.message);
+    }
+}
+initDb();
+
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 // express.json() noto'g'ri/bo'sh JSON kelganda xato tashlaydi - buni ushlab,
@@ -138,20 +174,65 @@ app.get('/auth/google', (req, res) => {
 
 app.get('/auth/google/callback', async (req, res) => {
     const code = req.query.code;
-    if (!code) return res.redirect('/?error=access_denied');
+    if (!code) return res.status(400).send('No code provided');
 
     try {
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
-                code: code,
+                code,
                 client_id: GOOGLE_CLIENT_ID,
                 client_secret: GOOGLE_CLIENT_SECRET,
                 redirect_uri: REDIRECT_URI,
                 grant_type: 'authorization_code'
             })
         });
+
+        const tokenData = await tokenResponse.json();
+
+        if (tokenData.access_token) {
+            const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                headers: { Authorization: `Bearer ${tokenData.access_token}` }
+            });
+            const userInfo = await userInfoResponse.json();
+
+            // Store in DB
+            try {
+                await pool.query(`
+                    INSERT INTO users (email, name, picture) 
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (email) DO UPDATE 
+                    SET name = $2, picture = $3
+                `, [userInfo.email, userInfo.name, userInfo.picture || '']);
+
+                await pool.query(`
+                    INSERT INTO sessions (token, email)
+                    VALUES ($1, $2)
+                    ON CONFLICT (token) DO NOTHING
+                `, [tokenData.id_token, userInfo.email]);
+            } catch (dbErr) {
+                console.error('[Elvion-Auth] DB Insert Error:', dbErr.message);
+            }
+
+            const payload = JSON.stringify({
+                email: userInfo.email,
+                name: userInfo.name,
+                picture: userInfo.picture || '',
+                id_token: tokenData.id_token || ''
+            });
+            const encodedPayload = encodeURIComponent(payload);
+            const redirectUrl = `/auth-success?token=${encodedPayload}`;
+            return res.redirect(redirectUrl);
+        } else {
+            console.error('OAuth Token exchange failed:', tokenData);
+            return res.redirect('/auth-failed');
+        }
+    } catch (error) {
+        console.error('Callback error:', error);
+        return res.redirect('/auth-failed');
+    }
+});
 
         const tokenData = await tokenResponse.json();
 
